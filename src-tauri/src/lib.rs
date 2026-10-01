@@ -7,7 +7,6 @@ use services::device_detector::DeviceDetectorService;
 use services::process_controller::ProcessController;
 use services::scheduler::FreezeSchedulerService;
 use services::storage::StorageManager;
-use std::sync::Arc;
 use tauri::State;
 
 pub struct AppState {
@@ -33,25 +32,25 @@ async fn pair_wireless(ip: String, port: u16, code: String) -> Result<String, St
 #[tauri::command]
 async fn get_device_state(
     serial: String,
-    state: State<'_, Arc<AppState>>,
+    state: State<'_, AppState>,
 ) -> Result<(SystemMemoryInfo, Vec<ProcessInfo>), String> {
     let remaining_map = state.scheduler.get_remaining_seconds_map(&serial);
     ProcessController::get_device_state(&serial, &remaining_map).await
 }
 
 #[tauri::command]
-async fn kill_app(serial: String, pkg: String) -> OperationResult {
-    ProcessController::kill_app(&serial, &pkg).await
+async fn kill_app(serial: String, pkg: String) -> Result<OperationResult, String> {
+    Ok(ProcessController::kill_app(&serial, &pkg).await)
 }
 
 #[tauri::command]
-async fn freeze_app(serial: String, pkg: String) -> OperationResult {
-    ProcessController::freeze_app(&serial, &pkg).await
+async fn freeze_app(serial: String, pkg: String) -> Result<OperationResult, String> {
+    Ok(ProcessController::freeze_app(&serial, &pkg).await)
 }
 
 #[tauri::command]
-async fn unfreeze_app(serial: String, pkg: String) -> OperationResult {
-    ProcessController::unfreeze_app(&serial, &pkg).await
+async fn unfreeze_app(serial: String, pkg: String) -> Result<OperationResult, String> {
+    Ok(ProcessController::unfreeze_app(&serial, &pkg).await)
 }
 
 #[tauri::command]
@@ -59,24 +58,24 @@ async fn schedule_freeze(
     serial: String,
     pkg: String,
     duration_seconds: i64,
-    state: State<'_, Arc<AppState>>,
-) -> OperationResult {
-    state.scheduler.schedule_freeze(&serial, &pkg, duration_seconds).await
+    state: State<'_, AppState>,
+) -> Result<OperationResult, String> {
+    Ok(state.scheduler.schedule_freeze(&serial, &pkg, duration_seconds).await)
 }
 
 #[tauri::command]
 async fn cancel_schedule(
     serial: String,
     pkg: String,
-    state: State<'_, Arc<AppState>>,
-) -> OperationResult {
-    state.scheduler.cancel_schedule(&serial, &pkg).await
+    state: State<'_, AppState>,
+) -> Result<OperationResult, String> {
+    Ok(state.scheduler.cancel_schedule(&serial, &pkg).await)
 }
 
 #[tauri::command]
 async fn one_click_boost(
     serial: String,
-    state: State<'_, Arc<AppState>>,
+    state: State<'_, AppState>,
 ) -> Result<OneClickBoostResult, String> {
     let remaining_map = state.scheduler.get_remaining_seconds_map(&serial);
     ProcessController::one_click_boost(&serial, &remaining_map).await
@@ -94,17 +93,17 @@ fn is_mock_mode() -> bool {
 }
 
 #[tauri::command]
-fn get_custom_whitelist(state: State<'_, Arc<AppState>>) -> Vec<String> {
-    state.storage.get_custom_whitelist().into_iter().collect()
+fn get_custom_whitelist(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    Ok(state.storage.get_custom_whitelist().into_iter().collect())
 }
 
 #[tauri::command]
-fn add_to_whitelist(pkg: String, state: State<'_, Arc<AppState>>) -> Result<(), String> {
+fn add_to_whitelist(pkg: String, state: State<'_, AppState>) -> Result<(), String> {
     state.storage.add_to_whitelist(&pkg)
 }
 
 #[tauri::command]
-fn remove_from_whitelist(pkg: String, state: State<'_, Arc<AppState>>) -> Result<(), String> {
+fn remove_from_whitelist(pkg: String, state: State<'_, AppState>) -> Result<(), String> {
     state.storage.remove_from_whitelist(&pkg)
 }
 
@@ -116,7 +115,7 @@ pub fn run() {
     // Kích hoạt scheduler background loop
     scheduler.start_scheduler_loop();
 
-    let app_state = Arc::new(AppState { storage, scheduler });
+    let app_state = AppState { storage, scheduler };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
