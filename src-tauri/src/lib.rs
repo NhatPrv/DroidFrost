@@ -112,14 +112,17 @@ pub fn run() {
     let storage = StorageManager::new();
     let scheduler = FreezeSchedulerService::new(storage.clone());
 
-    // Kích hoạt scheduler background loop
-    scheduler.start_scheduler_loop();
-
     let app_state = AppState { storage, scheduler };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(app_state)
+        .setup(|app| {
+            use tauri::Manager;
+            let state = app.state::<AppState>();
+            state.scheduler.start_scheduler_loop();
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_devices,
             connect_wireless,

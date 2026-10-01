@@ -82,8 +82,7 @@ impl FreezeSchedulerService {
     pub fn start_scheduler_loop(&self) {
         let storage = self.storage.clone();
         let is_running = self.is_running.clone();
-
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             {
                 let mut running = is_running.lock().await;
                 if *running {
