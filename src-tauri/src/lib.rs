@@ -2,7 +2,6 @@ pub mod models;
 pub mod services;
 
 use models::{DeviceInfo, OneClickBoostResult, OperationResult, ProcessInfo, SystemMemoryInfo};
-use services::adb_executor::AdbExecutor;
 use services::device_detector::DeviceDetectorService;
 use services::process_controller::ProcessController;
 use services::scheduler::FreezeSchedulerService;
@@ -82,17 +81,6 @@ async fn one_click_boost(
 }
 
 #[tauri::command]
-fn set_mock_mode(enabled: bool) -> bool {
-    AdbExecutor::set_mock_mode(enabled);
-    enabled
-}
-
-#[tauri::command]
-fn is_mock_mode() -> bool {
-    AdbExecutor::is_mock_mode()
-}
-
-#[tauri::command]
 fn get_custom_whitelist(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     Ok(state.storage.get_custom_whitelist().into_iter().collect())
 }
@@ -134,8 +122,6 @@ pub fn run() {
             schedule_freeze,
             cancel_schedule,
             one_click_boost,
-            set_mock_mode,
-            is_mock_mode,
             get_custom_whitelist,
             add_to_whitelist,
             remove_from_whitelist
