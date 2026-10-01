@@ -15,261 +15,208 @@
   export let onOneClickBoost: () => void;
 </script>
 
-<div class="filter-bar glass-panel">
-  <!-- Tabs Selector -->
-  <div class="tabs-group">
+<div class="toolbar">
+  <!-- Segmented Tab Group -->
+  <div class="segmented-control">
     <button
-      class="tab-btn"
+      class="segment-btn"
       class:active={currentTab === 'all'}
       on:click={() => onTabChange('all')}
     >
-      Tất cả <span class="counter">{countAll}</span>
+      Tất cả <span class="badge-num">{countAll}</span>
     </button>
 
     <button
-      class="tab-btn"
+      class="segment-btn"
       class:active={currentTab === 'running'}
       on:click={() => onTabChange('running')}
     >
-      <span class="dot-indicator green"></span>
-      Đang chạy <span class="counter">{countRunning}</span>
+      <span class="dot running"></span>
+      Đang chạy <span class="badge-num">{countRunning}</span>
     </button>
 
     <button
-      class="tab-btn"
+      class="segment-btn"
       class:active={currentTab === 'frozen'}
       on:click={() => onTabChange('frozen')}
     >
-      <span class="dot-indicator blue"></span>
-      Đã đóng băng <span class="counter">{countFrozen}</span>
+      <span class="dot frozen"></span>
+      Đã đóng băng <span class="badge-num">{countFrozen}</span>
     </button>
 
     <button
-      class="tab-btn"
+      class="segment-btn"
       class:active={currentTab === 'scheduled'}
       on:click={() => onTabChange('scheduled')}
     >
-      <span class="dot-indicator amber"></span>
-      Hẹn giờ <span class="counter">{countScheduled}</span>
+      <span class="dot scheduled"></span>
+      Hẹn giờ <span class="badge-num">{countScheduled}</span>
     </button>
   </div>
 
-  <!-- Actions & Search Right Side -->
-  <div class="controls-group">
-    <!-- Live Search -->
-    <div class="search-wrap">
-      <span class="search-icon">🔍</span>
+  <!-- Right Actions -->
+  <div class="actions-dock">
+    <!-- Clean Search Input -->
+    <div class="search-box">
+      <svg class="search-svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="m21 21-4.35-4.35"/>
+      </svg>
       <input
         type="text"
-        placeholder="Tìm theo tên app hoặc package..."
+        placeholder="Lọc theo tên hoặc package..."
         bind:value={searchQuery}
       />
       {#if searchQuery}
-        <button class="clear-btn" on:click={() => (searchQuery = '')}>✕</button>
+        <button class="clear-text" on:click={() => (searchQuery = '')}>✕</button>
       {/if}
     </div>
 
-    <!-- System Apps Toggle -->
-    <label class="toggle-wrap" title="Hiện hoặc ẩn ứng dụng cài sẵn trong ROM">
+    <!-- System Apps Checkbox -->
+    <label class="system-toggle" title="Hiển thị hoặc ẩn các gói hệ điều hành cài sẵn">
       <input
         type="checkbox"
         checked={showSystemApps}
         on:change={onToggleSystem}
       />
-      <span class="toggle-slider"></span>
-      <span class="toggle-label">App hệ thống</span>
+      <span>App hệ thống</span>
     </label>
 
-    <!-- One-Click Boost Button -->
+    <!-- Clean Boost Action -->
     <button
-      class="btn btn-primary boost-btn"
+      class="btn btn-primary boost-action"
       on:click={onOneClickBoost}
       disabled={isBoosting}
-      title="Giải phóng RAM ngay lập tức, tắt các app ngầm ngoài danh sách bảo vệ"
+      title="Buộc dừng toàn bộ ứng dụng người dùng chạy nền để thu hồi RAM"
     >
-      {#if isBoosting}
-        <span class="spinner"></span> Đang tối ưu...
-      {:else}
-        ⚡ One-Click Boost
-      {/if}
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+      {isBoosting ? 'Đang giải phóng...' : 'One-Click Boost'}
     </button>
   </div>
 </div>
 
 <style>
-  .filter-bar {
+  .toolbar {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 12px 24px;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--bg-app);
     border-bottom: 1px solid var(--border-subtle);
     gap: 16px;
     flex-wrap: wrap;
   }
 
-  .tabs-group {
+  .segmented-control {
     display: flex;
-    align-items: center;
-    background: var(--bg-surface-elevated);
-    border-radius: var(--radius-md);
-    padding: 4px;
-    gap: 4px;
+    background: var(--bg-surface);
     border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    gap: 2px;
   }
 
-  .tab-btn {
+  .segment-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    padding: 6px 14px;
-    border-radius: var(--radius-sm);
-    font-size: 13px;
-    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.15s ease;
   }
 
-  .tab-btn:hover {
+  .segment-btn:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.04);
   }
 
-  .tab-btn.active {
-    background: var(--bg-surface);
+  .segment-btn.active {
+    background: var(--bg-surface-elevated);
     color: var(--text-primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   }
 
-  .counter {
+  .badge-num {
     background: rgba(255, 255, 255, 0.08);
-    padding: 1px 6px;
-    border-radius: var(--radius-full);
-    font-size: 11px;
-    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-family: var(--font-mono);
   }
 
-  .dot-indicator {
+  .dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
   }
 
-  .dot-indicator.green { background: var(--status-running); }
-  .dot-indicator.blue { background: var(--status-frozen); }
-  .dot-indicator.amber { background: var(--status-scheduled); }
+  .dot.running { background: var(--status-running); }
+  .dot.frozen { background: var(--status-frozen); }
+  .dot.scheduled { background: var(--status-scheduled); }
 
-  .controls-group {
+  .actions-dock {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
   }
 
-  .search-wrap {
+  .search-box {
     display: flex;
     align-items: center;
-    background: var(--bg-surface-elevated);
+    background: var(--bg-surface);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
-    padding: 6px 12px;
-    width: 260px;
-    gap: 8px;
+    padding: 5px 10px;
+    width: 240px;
+    gap: 6px;
   }
 
-  .search-wrap:focus-within {
-    border-color: var(--accent-cyan);
-    box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+  .search-box:focus-within {
+    border-color: var(--border-focus);
   }
 
-  .search-wrap input {
+  .search-svg {
+    color: var(--text-muted);
+  }
+
+  .search-box input {
     background: transparent;
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 12px;
     width: 100%;
     font-family: inherit;
   }
 
-  .search-icon {
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-
-  .clear-btn {
+  .clear-text {
     background: none;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
     font-size: 11px;
-    padding: 0 4px;
+    padding: 0;
   }
 
-  .toggle-wrap {
+  .system-toggle {
     display: flex;
     align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: 13px;
+    gap: 6px;
+    font-size: 12px;
     color: var(--text-secondary);
-    font-weight: 500;
+    cursor: pointer;
   }
 
-  .toggle-wrap input {
-    display: none;
-  }
-
-  .toggle-slider {
-    width: 32px;
-    height: 18px;
-    background: var(--bg-surface-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-full);
-    position: relative;
-    transition: all 0.3s;
-  }
-
-  .toggle-slider::before {
-    content: '';
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    left: 2px;
-    top: 2px;
-    background: var(--text-muted);
-    border-radius: 50%;
-    transition: all 0.3s;
-  }
-
-  .toggle-wrap input:checked + .toggle-slider {
-    background: var(--accent-cyan);
-    border-color: var(--accent-cyan);
-  }
-
-  .toggle-wrap input:checked + .toggle-slider::before {
-    transform: translateX(14px);
-    background: #000;
-  }
-
-  .boost-btn {
-    padding: 8px 18px;
-    font-size: 13px;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-  }
-
-  .spinner {
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+  .boost-action {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
   }
 </style>
