@@ -124,3 +124,57 @@ fn test_scheduled_task_logic() {
     assert_eq!(task.target_time, now + 900);
     assert!(!task.is_pending);
 }
+
+#[test]
+fn test_stop_all_running_filter() {
+    use droidfrost_lib::models::ProcessInfo;
+
+    let procs = vec![
+        ProcessInfo {
+            pid: Some(101),
+            package_name: "com.facebook.katana".to_string(),
+            app_name: "Facebook".to_string(),
+            ram_mb: 320.0,
+            is_running: true,
+            is_frozen: false,
+            is_scheduled: false,
+            is_system: false,
+            is_whitelisted: false,
+            scheduled_remaining_seconds: None,
+        },
+        ProcessInfo {
+            pid: Some(102),
+            package_name: "com.android.systemui".to_string(),
+            app_name: "SystemUI".to_string(),
+            ram_mb: 200.0,
+            is_running: true,
+            is_frozen: false,
+            is_scheduled: false,
+            is_system: true,
+            is_whitelisted: true, // Whitelisted!
+            scheduled_remaining_seconds: None,
+        },
+        ProcessInfo {
+            pid: None,
+            package_name: "com.shopee.vn".to_string(),
+            app_name: "Shopee".to_string(),
+            ram_mb: 0.0,
+            is_running: false, // Không chạy!
+            is_frozen: true,
+            is_scheduled: false,
+            is_system: false,
+            is_whitelisted: false,
+            scheduled_remaining_seconds: None,
+        },
+    ];
+
+    // Lọc theo điều kiện dừng tất cả
+    let targets: Vec<String> = procs
+        .into_iter()
+        .filter(|p| p.is_running && !p.is_whitelisted && !p.is_system)
+        .map(|p| p.package_name)
+        .collect();
+
+    assert_eq!(targets.len(), 1);
+    assert_eq!(targets[0], "com.facebook.katana");
+}

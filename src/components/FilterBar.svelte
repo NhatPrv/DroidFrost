@@ -9,10 +9,12 @@
   export let countFrozen: number = 0;
   export let countScheduled: number = 0;
   export let isBoosting: boolean = false;
+  export let isStoppingAll: boolean = false;
 
   export let onTabChange: (tab: TabFilter) => void;
   export let onToggleSystem: () => void;
   export let onOneClickBoost: () => void;
+  export let onStopAllRunning: () => void;
 </script>
 
 <div class="toolbar">
@@ -81,6 +83,19 @@
       />
       <span>App hệ thống</span>
     </label>
+
+    <!-- Stop All Running Action -->
+    <button
+      class="btn btn-danger stop-all-action"
+      on:click={onStopAllRunning}
+      disabled={isStoppingAll || countRunning === 0}
+      title="Buộc dừng ngay lập tức toàn bộ {countRunning} ứng dụng đang chạy nền"
+    >
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="5" y="5" width="14" height="14" rx="2"/>
+      </svg>
+      {isStoppingAll ? 'Đang dừng...' : `Dừng tất cả (${countRunning})`}
+    </button>
 
     <!-- Clean Boost Action -->
     <button
@@ -212,6 +227,17 @@
     font-size: 12px;
     color: var(--text-secondary);
     cursor: pointer;
+  }
+
+  .stop-all-action {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .stop-all-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .boost-action {

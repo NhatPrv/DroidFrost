@@ -81,6 +81,16 @@ async fn one_click_boost(
 }
 
 #[tauri::command]
+async fn stop_all_running(
+    serial: String,
+    include_system: bool,
+    state: State<'_, AppState>,
+) -> Result<OneClickBoostResult, String> {
+    let remaining_map = state.scheduler.get_remaining_seconds_map(&serial);
+    ProcessController::stop_all_running(&serial, include_system, &remaining_map).await
+}
+
+#[tauri::command]
 fn get_custom_whitelist(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     Ok(state.storage.get_custom_whitelist().into_iter().collect())
 }
@@ -122,6 +132,7 @@ pub fn run() {
             schedule_freeze,
             cancel_schedule,
             one_click_boost,
+            stop_all_running,
             get_custom_whitelist,
             add_to_whitelist,
             remove_from_whitelist

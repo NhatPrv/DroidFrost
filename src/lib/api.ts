@@ -86,6 +86,19 @@ export const api = {
     return await inv('one_click_boost', { serial });
   },
 
+  async stopAllRunning(serial: string, includeSystem: boolean = false): Promise<OneClickBoostResult> {
+    const inv = await getInvoke();
+    if (!inv) {
+      return {
+        killed_count: 0,
+        frozen_count: 0,
+        freed_ram_mb: 0,
+        packages_affected: [],
+      };
+    }
+    return await inv('stop_all_running', { serial, includeSystem });
+  },
+
   async connectWireless(ip: string, port: number): Promise<string> {
     const inv = await getInvoke();
     if (!inv) return 'Chưa kết nối Tauri Backend';

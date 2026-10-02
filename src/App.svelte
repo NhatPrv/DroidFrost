@@ -26,6 +26,7 @@
   let showSystemApps: boolean = false;
   let searchQuery: string = '';
   let isBoosting: boolean = false;
+  let isStoppingAll: boolean = false;
   let isWirelessModalOpen: boolean = false;
 
   let toastMessage: string = '';
@@ -128,6 +129,20 @@
     }
   }
 
+  async function handleStopAllRunning() {
+    if (!selectedSerial) return;
+    isStoppingAll = true;
+    try {
+      const res = await api.stopAllRunning(selectedSerial, showSystemApps);
+      showToast(`Đã dừng thành công ${res.killed_count} tiến trình đang chạy, giải phóng ${res.freed_ram_mb} MB RAM!`);
+      await refreshState();
+    } catch (e: any) {
+      showToast('Lỗi khi dừng các tiến trình: ' + e);
+    } finally {
+      isStoppingAll = false;
+    }
+  }
+
   // Lọc danh sách tiến trình theo tab và search
   $: filteredProcesses = processes.filter((p) => {
     if (!showSystemApps && p.is_system) {
@@ -193,9 +208,11 @@
     {countFrozen}
     {countScheduled}
     {isBoosting}
+    {isStoppingAll}
     onTabChange={(tab) => (currentTab = tab)}
     onToggleSystem={() => (showSystemApps = !showSystemApps)}
     onOneClickBoost={handleOneClickBoost}
+    onStopAllRunning={handleStopAllRunning}
   />
 
   <!-- Main Content Process Table -->

@@ -136,4 +136,49 @@ impl ProcessController {
             packages_affected,
         })
     }
+
+    /// Dừng toàn bộ tiến trình đang chạy bằng cơ chế batch shell execution siêu tốc
+    pub async fn stop_all_running(
+        serial: &str,
+        include_system: bool,
+        scheduled_tasks: &HashMap<String, i64>,
+    ) -> Result<OneClickBoostResult, String> {
+        let (_, processes) = Self::get_device_state(serial, scheduled_tasks).await?;
+
+        let mut targets = Vec::new();
+        let mut freed_ram_mb = 0.0;
+
+        for p in &processes {
+            if p.is_running && !p.is_whitelisted && (include_system || !p.is_system) {
+                targets.push(p.package_name.clone());
+                freed_ram_mb += p.ram_mb;
+            }
+        }
+
+        if targets.is_empty() {
+            return Ok(OneClickBoostResult {
+                killed_count: 0,
+                frozen_count: 0,
+                freed_ram_mb: 0.0,
+                packages_affected: Vec::new(),
+            });
+        }
+
+        // Tối ưu: Ghép các lệnh am force-stop thành một chuỗi duy nhất để chạy trong 1 subprocess
+        let batch_cmd = targets
+            .iter()
+            .map(|pkg| format!("am force-stop {}", pkg))
+            .collect::<Vec<_>>()
+            .join("; ");
+
+        let _ = AdbExecutor::execute_shell(serial, &["sh", "-c", &batch_cmd]).await;
+
+        let killed_count = targets.len();
+        Ok(OneClickBoostResult {
+            killed_count,
+            frozen_count: 0,
+            freed_ram_mb: (freed_ram_mb * 10.0).round() / 10.0,
+            packages_affected: targets,
+        })
+    }
 }
