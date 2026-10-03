@@ -19,6 +19,7 @@
     used_ram_mb: 0,
     free_ram_mb: 0,
     cached_ram_mb: 0,
+    process_metric: 'PSS',
   };
   let processes: ProcessInfo[] = [];
 
@@ -32,6 +33,7 @@
   let toastMessage: string = '';
   let toastTimeout: any = null;
   let pollInterval: any = null;
+  let refreshInFlight = false;
 
   function showToast(msg: string) {
     toastMessage = msg;
@@ -54,13 +56,20 @@
   }
 
   async function refreshState() {
-    if (!selectedSerial) return;
+    if (!selectedSerial || refreshInFlight) return;
+    const serial = selectedSerial;
+    refreshInFlight = true;
     try {
-      const [mem, procs] = await api.getDeviceState(selectedSerial);
-      memory = mem;
-      processes = procs;
+      const [mem, procs] = await api.getDeviceState(serial);
+      if (serial === selectedSerial) {
+        memory = mem;
+        processes = procs;
+      }
     } catch (e: any) {
       console.error('Lỗi cập nhật trạng thái:', e);
+      showToast(`Không đọc được trạng thái thiết bị: ${e}`);
+    } finally {
+      refreshInFlight = false;
     }
   }
 
@@ -120,7 +129,7 @@
     isBoosting = true;
     try {
       const res = await api.oneClickBoost(selectedSerial);
-      showToast(`One-Click Boost: Đã dừng ${res.killed_count} ứng dụng, giải phóng ${res.freed_ram_mb} MB RAM!`);
+      showToast(`Đã gửi lệnh dừng cho ${res.killed_count} ứng dụng. RAM đang được đo lại.`);
       await refreshState();
     } catch (e: any) {
       showToast('Lỗi khi thực hiện boost: ' + e);
@@ -133,8 +142,8 @@
     if (!selectedSerial) return;
     isStoppingAll = true;
     try {
-      const res = await api.stopAllRunning(selectedSerial, showSystemApps);
-      showToast(`Đã dừng thành công ${res.killed_count} tiến trình đang chạy, giải phóng ${res.freed_ram_mb} MB RAM!`);
+      const res = await api.stopAllRunning(selectedSerial, false);
+      showToast(`Đã gửi lệnh dừng cho ${res.killed_count} ứng dụng. RAM đang được đo lại.`);
       await refreshState();
     } catch (e: any) {
       showToast('Lỗi khi dừng các tiến trình: ' + e);
@@ -165,6 +174,7 @@
 
   $: countAll = processes.filter(p => showSystemApps || !p.is_system).length;
   $: countRunning = processes.filter(p => p.is_running && (showSystemApps || !p.is_system)).length;
+  $: countStoppable = processes.filter(p => p.is_running && !p.is_system && !p.is_whitelisted).length;
   $: countFrozen = processes.filter(p => p.is_frozen && (showSystemApps || !p.is_system)).length;
   $: countScheduled = processes.filter(p => p.is_scheduled && (showSystemApps || !p.is_system)).length;
 
@@ -205,6 +215,7 @@
     bind:searchQuery
     {countAll}
     {countRunning}
+    {countStoppable}
     {countFrozen}
     {countScheduled}
     {isBoosting}
@@ -218,6 +229,7 @@
   <!-- Main Content Process Table -->
   <ProcessTable
     processes={filteredProcesses}
+    processMetric={memory.process_metric}
     onKill={handleKill}
     onFreeze={handleFreeze}
     onUnfreeze={handleUnfreeze}

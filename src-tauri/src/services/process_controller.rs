@@ -68,29 +68,28 @@ impl ProcessController {
         scheduled_tasks: &HashMap<String, i64>,
     ) -> Result<(SystemMemoryInfo, Vec<ProcessInfo>), String> {
         // 1. Quét danh sách package bên thứ 3 (User apps)
-        let user_pkgs_output = AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-3", "-f"])
-            .await
-            .unwrap_or_default();
+        let user_pkgs_output = AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-3", "-f"]).await?;
         let user_pkgs = ProcessParser::parse_package_list(&user_pkgs_output, false);
 
         // 2. Quét danh sách package hệ thống (System apps)
-        let sys_pkgs_output = AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-s", "-f"])
-            .await
-            .unwrap_or_default();
+        let sys_pkgs_output = AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-s", "-f"]).await?;
         let sys_pkgs = ProcessParser::parse_package_list(&sys_pkgs_output, true);
 
         // 3. Quét danh sách app đang bị đóng băng
-        let disabled_output = AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-d"])
-            .await
-            .unwrap_or_default();
+        let disabled_output = AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-d"]).await?;
         let disabled_set = ProcessParser::parse_disabled_packages(&disabled_output);
 
         // 4. Quét dumpsys meminfo để lấy RAM hệ thống và RAM từng tiến trình
-        let meminfo_output = AdbExecutor::execute_shell(serial, &["dumpsys", "meminfo"])
-            .await
-            .unwrap_or_default();
-        let sys_memory = ProcessParser::parse_system_memory(&meminfo_output);
-        let ram_map = ProcessParser::parse_process_ram_table(&meminfo_output);
+        let proc_meminfo = AdbExecutor::execute_shell(serial, &["cat", "/proc/meminfo"]).await?;
+        let mut sys_memory = ProcessParser::parse_system_memory(&proc_meminfo);
+        if sys_memory.total_ram_mb <= 0.0 { return Err("Không đọc được RAM từ /proc/meminfo".into()); }
+        let meminfo_output = AdbExecutor::execute_shell(serial, &["dumpsys", "meminfo"]).await.unwrap_or_default();
+        let mut ram_map = ProcessParser::parse_process_ram_table(&meminfo_output);
+        if ram_map.is_empty() {
+            let ps_output = AdbExecutor::execute_shell(serial, &["ps", "-A", "-o", "PID,NAME,RSS"]).await?;
+            ram_map = ProcessParser::parse_ps_rss(&ps_output);
+            sys_memory.process_metric = "RSS".to_string();
+        }
 
         // Hợp nhất danh sách
         let mut all_packages = user_pkgs;
@@ -114,7 +113,6 @@ impl ProcessController {
         let (_, processes) = Self::get_device_state(serial, scheduled_tasks).await?;
 
         let mut killed_count = 0;
-        let mut freed_ram_mb = 0.0;
         let mut packages_affected = Vec::new();
 
         for p in processes {
@@ -123,7 +121,6 @@ impl ProcessController {
                 let kill_res = Self::kill_app(serial, &p.package_name).await;
                 if kill_res.success {
                     killed_count += 1;
-                    freed_ram_mb += p.ram_mb;
                     packages_affected.push(p.package_name);
                 }
             }
@@ -132,7 +129,7 @@ impl ProcessController {
         Ok(OneClickBoostResult {
             killed_count,
             frozen_count: 0,
-            freed_ram_mb: (freed_ram_mb * 10.0).round() / 10.0,
+            freed_ram_mb: 0.0,
             packages_affected,
         })
     }
@@ -140,18 +137,16 @@ impl ProcessController {
     /// Dừng toàn bộ tiến trình đang chạy bằng cơ chế batch shell execution siêu tốc
     pub async fn stop_all_running(
         serial: &str,
-        include_system: bool,
+        _include_system: bool,
         scheduled_tasks: &HashMap<String, i64>,
     ) -> Result<OneClickBoostResult, String> {
         let (_, processes) = Self::get_device_state(serial, scheduled_tasks).await?;
 
         let mut targets = Vec::new();
-        let mut freed_ram_mb = 0.0;
 
         for p in &processes {
-            if p.is_running && !p.is_whitelisted && (include_system || !p.is_system) {
+            if p.is_running && !p.is_whitelisted && !p.is_system {
                 targets.push(p.package_name.clone());
-                freed_ram_mb += p.ram_mb;
             }
         }
 
@@ -164,21 +159,16 @@ impl ProcessController {
             });
         }
 
-        // Tối ưu: Ghép các lệnh am force-stop thành một chuỗi duy nhất để chạy trong 1 subprocess
-        let batch_cmd = targets
-            .iter()
-            .map(|pkg| format!("am force-stop {}", pkg))
-            .collect::<Vec<_>>()
-            .join("; ");
-
-        let _ = AdbExecutor::execute_shell(serial, &["sh", "-c", &batch_cmd]).await;
-
-        let killed_count = targets.len();
+        let mut succeeded = Vec::new();
+        for pkg in targets {
+            if Self::kill_app(serial, &pkg).await.success { succeeded.push(pkg); }
+        }
+        let killed_count = succeeded.len();
         Ok(OneClickBoostResult {
             killed_count,
             frozen_count: 0,
-            freed_ram_mb: (freed_ram_mb * 10.0).round() / 10.0,
-            packages_affected: targets,
+            freed_ram_mb: 0.0,
+            packages_affected: succeeded,
         })
     }
 }

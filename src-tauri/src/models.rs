@@ -43,6 +43,7 @@ pub struct SystemMemoryInfo {
     pub used_ram_mb: f64,
     pub free_ram_mb: f64,
     pub cached_ram_mb: f64,
+    pub process_metric: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

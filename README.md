@@ -98,4 +98,12 @@ npm run tauri build
 
 ## 📄 Bản quyền (License)
 
+### Cách đọc số liệu RAM
+
+- RAM tổng, khả dụng và đã dùng lấy từ `/proc/meminfo` (`MemTotal` và `MemAvailable`). RAM đã dùng = tổng trừ khả dụng. Bộ nhớ đệm là `Cached + Buffers + SReclaimable` để tham khảo, đã nằm trong các nhóm trên.
+- Cột ứng dụng ghi **PSS** khi Android cung cấp `dumpsys meminfo`; nếu dịch vụ đó không hoạt động, cột ghi **RSS** lấy từ `ps`. RSS tính cả trang chia sẻ nên không cộng các ứng dụng để so với RAM toàn máy.
+- Lệnh buộc dừng không bảo đảm RAM giảm đúng bằng RAM trước khi dừng. Ứng dụng tự khởi chạy lại và bộ nhớ đệm có thể thay đổi; hãy xem số đo sau khi quét lại.
+- Dừng tất cả chỉ tác động ứng dụng người dùng đang chạy. Hiển thị app hệ thống là bộ lọc xem, không mở rộng phạm vi dừng tất cả.
+
+
 Dự án được phân phối dưới giấy phép mã nguồn mở **Apache License 2.0**. Xem chi tiết tại file [LICENSE](LICENSE).

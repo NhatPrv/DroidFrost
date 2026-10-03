@@ -33,16 +33,13 @@ RFCT40ABCDE            device product:r8qxxx model:SM_G780G device:r8q transport
 
 #[test]
 fn test_parse_system_memory() {
-    let sample_meminfo = r#"
-Total RAM: 7,842,120K (status normal)
- Free RAM: 3,214,560K (  984,200K cached pss + 1,820,360K cached kernel +   410,000K free)
- Used RAM: 4,627,560K (3,520,120K used pss + 1,107,440K kernel)
-"#;
+    let sample_meminfo = "MemTotal: 7842120 kB\nMemAvailable: 3214560 kB\nCached: 1000000 kB\nBuffers: 2000 kB\n";
 
     let mem = ProcessParser::parse_system_memory(sample_meminfo);
     assert!(mem.total_ram_mb > 7600.0 && mem.total_ram_mb < 7700.0);
     assert!(mem.free_ram_mb > 3100.0 && mem.free_ram_mb < 3200.0);
     assert!(mem.used_ram_mb > 4500.0 && mem.used_ram_mb < 4600.0);
+    assert_eq!(ProcessParser::parse_system_memory("").total_ram_mb, 0.0);
 }
 
 #[test]
@@ -52,6 +49,9 @@ Total PSS by process:
     215,680K: com.facebook.katana (pid 14522)
     124,320K: com.zing.zalo (pid 18901)
      45,100K: com.android.systemui:screenshot (pid 2411)
+
+Total PSS by OOM adjustment:
+    215,680K: com.facebook.katana (pid 14522)
 "#;
 
     let map = ProcessParser::parse_process_ram_table(sample_procs);
@@ -64,6 +64,15 @@ Total PSS by process:
     let zalo = map.get("com.zing.zalo").unwrap();
     assert_eq!(zalo.0, Some(18901));
     assert!(zalo.1 > 121.0 && zalo.1 < 122.0);
+}
+
+#[test]
+fn test_parse_ps_rss_fallback() {
+    let ps = "PID NAME RSS\n14091 com.facebook.katana 183000\n14092 com.facebook.katana:service 12000\n100 surfaceflinger 33000\n";
+    let map = ProcessParser::parse_ps_rss(ps);
+    assert_eq!(map.len(), 1);
+    assert_eq!(map["com.facebook.katana"].0, Some(14091));
+    assert!((map["com.facebook.katana"].1 - 190.4296875).abs() < 0.01);
 }
 
 #[test]

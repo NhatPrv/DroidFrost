@@ -8,6 +8,7 @@
     used_ram_mb: 0,
     free_ram_mb: 0,
     cached_ram_mb: 0,
+    process_metric: 'PSS',
   };
   export let onSelectDevice: (serial: string) => void;
   export let onRefresh: () => void;
@@ -97,7 +98,7 @@
         </div>
         <div class="metric-sub-stats">
           <span>Khả dụng: {formatMb(memory.free_ram_mb)}</span>
-          <span>Bộ nhớ đệm: {formatMb(memory.cached_ram_mb)}</span>
+          <span>Đệm tệp (tham khảo): {formatMb(memory.cached_ram_mb)}</span>
           <span>Tổng dung lượng: {formatMb(memory.total_ram_mb)}</span>
         </div>
       </div>

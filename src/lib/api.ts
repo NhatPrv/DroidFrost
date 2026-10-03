@@ -32,7 +32,7 @@ export const api = {
     const inv = await getInvoke();
     if (!inv) {
       return [
-        { total_ram_mb: 0, used_ram_mb: 0, free_ram_mb: 0, cached_ram_mb: 0 },
+        { total_ram_mb: 0, used_ram_mb: 0, free_ram_mb: 0, cached_ram_mb: 0, process_metric: 'PSS' },
         [],
       ];
     }

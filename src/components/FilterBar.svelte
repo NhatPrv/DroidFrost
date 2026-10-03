@@ -6,6 +6,7 @@
   export let searchQuery: string = '';
   export let countAll: number = 0;
   export let countRunning: number = 0;
+  export let countStoppable: number = 0;
   export let countFrozen: number = 0;
   export let countScheduled: number = 0;
   export let isBoosting: boolean = false;
@@ -88,13 +89,13 @@
     <button
       class="btn btn-danger stop-all-action"
       on:click={onStopAllRunning}
-      disabled={isStoppingAll || countRunning === 0}
-      title="Buộc dừng ngay lập tức toàn bộ {countRunning} ứng dụng đang chạy nền"
+      disabled={isStoppingAll || countStoppable === 0}
+      title="Buộc dừng ứng dụng người dùng đang chạy; không dừng ứng dụng hệ thống"
     >
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="5" y="5" width="14" height="14" rx="2"/>
       </svg>
-      {isStoppingAll ? 'Đang dừng...' : `Dừng tất cả (${countRunning})`}
+      {isStoppingAll ? 'Đang dừng...' : `Dừng tất cả (${countStoppable})`}
     </button>
 
     <!-- Clean Boost Action -->

@@ -3,6 +3,7 @@
   import { getAppIconSvg } from '../lib/icons';
 
   export let processes: ProcessInfo[] = [];
+  export let processMetric: 'PSS' | 'RSS' = 'PSS';
   export let onKill: (pkg: string) => void;
   export let onFreeze: (pkg: string) => void;
   export let onUnfreeze: (pkg: string) => void;
@@ -88,7 +89,7 @@
         </th>
         <th class="col-type">Phân loại</th>
         <th class="col-ram sortable" on:click={() => handleSort('ram')}>
-          Bộ nhớ RAM {sortField === 'ram' ? (sortAsc ? '▲' : '▼') : ''}
+          RAM {processMetric} {sortField === 'ram' ? (sortAsc ? '▲' : '▼') : ''}
         </th>
         <th class="col-status">Trạng thái</th>
         <th class="col-actions">Tác vụ</th>

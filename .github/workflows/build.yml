@@ -41,9 +41,16 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install Frontend Dependencies
-        run: npm ci || npm install
+        run: npm ci
+
+      - name: Check frontend
+        run: npx svelte-check --tsconfig ./tsconfig.json
+
+      - name: Test backend
+        run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Build Desktop Application
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

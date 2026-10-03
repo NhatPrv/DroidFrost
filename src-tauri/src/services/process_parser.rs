@@ -87,36 +87,25 @@ impl ProcessParser {
         disabled
     }
 
-    /// Phân tích RAM toàn hệ thống từ `dumpsys meminfo`
+    /// Read physical RAM from /proc/meminfo. MemAvailable includes reclaimable cache.
     pub fn parse_system_memory(output: &str) -> SystemMemoryInfo {
-        lazy_static::lazy_static! {
-            static ref RE_TOTAL: Regex = Regex::new(r"Total RAM:\s*([\d,]+)K").unwrap();
-            static ref RE_FREE: Regex = Regex::new(r"Free RAM:\s*([\d,]+)K").unwrap();
-            static ref RE_USED: Regex = Regex::new(r"Used RAM:\s*([\d,]+)K").unwrap();
-        }
-
-        let parse_kb = |re: &Regex, text: &str| -> f64 {
-            if let Some(caps) = re.captures(text) {
-                if let Some(m) = caps.get(1) {
-                    let num_str = m.as_str().replace(',', "");
-                    if let Ok(val) = num_str.parse::<f64>() {
-                        return (val / 1024.0 * 10.0).round() / 10.0; // Chuyển KB sang MB
-                    }
-                }
-            }
-            0.0
+        let field = |name: &str| -> f64 {
+            output.lines().find_map(|line| {
+                let value = line.strip_prefix(name)?.trim().split_whitespace().next()?;
+                value.parse::<f64>().ok().map(|kb| kb / 1024.0)
+            }).unwrap_or(0.0)
         };
-
-        let total_ram_mb = parse_kb(&RE_TOTAL, output);
-        let free_ram_mb = parse_kb(&RE_FREE, output);
-        let used_ram_mb = parse_kb(&RE_USED, output);
-        let cached_ram_mb = (total_ram_mb - used_ram_mb - free_ram_mb).max(0.0);
+        let total_ram_mb = field("MemTotal:");
+        let free_ram_mb = field("MemAvailable:");
+        let cached_ram_mb = field("Cached:") + field("Buffers:") + field("SReclaimable:");
+        let used_ram_mb = (total_ram_mb - free_ram_mb).max(0.0);
 
         SystemMemoryInfo {
-            total_ram_mb: if total_ram_mb > 0.0 { total_ram_mb } else { 8192.0 },
-            used_ram_mb: if used_ram_mb > 0.0 { used_ram_mb } else { 4096.0 },
-            free_ram_mb: if free_ram_mb > 0.0 { free_ram_mb } else { 4096.0 },
+            total_ram_mb,
+            used_ram_mb,
+            free_ram_mb,
             cached_ram_mb,
+            process_metric: "PSS".to_string(),
         }
     }
 
@@ -130,7 +119,16 @@ impl ProcessParser {
         }
 
         let mut map = HashMap::new();
+        let mut in_process_section = false;
         for line in output.lines() {
+            if line.trim() == "Total PSS by process:" {
+                in_process_section = true;
+                continue;
+            }
+            if in_process_section && line.trim().is_empty() {
+                break;
+            }
+            if !in_process_section { continue; }
             if let Some(caps) = RE_LINE.captures(line) {
                 let ram_kb_str = caps.get(1).map_or("0", |m| m.as_str()).replace(',', "");
                 let full_pkg = caps.get(2).map_or("", |m| m.as_str());
@@ -151,6 +149,22 @@ impl ProcessParser {
                         .or_insert((pid, mb));
                 }
             }
+        }
+        map
+    }
+
+    /// ps RSS is a fallback: shared pages are counted in every process.
+    pub fn parse_ps_rss(output: &str) -> HashMap<String, (Option<u32>, f64)> {
+        let mut map = HashMap::new();
+        for line in output.lines().skip(1) {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            if fields.len() < 3 { continue; }
+            let (Ok(pid), Ok(kb)) = (fields[0].parse::<u32>(), fields[fields.len()-1].parse::<f64>()) else { continue; };
+            let name = fields[1].split(':').next().unwrap_or(fields[1]);
+            if !name.contains('.') { continue; }
+            map.entry(name.to_string())
+                .and_modify(|entry: &mut (Option<u32>, f64)| entry.1 += kb / 1024.0)
+                .or_insert((Some(pid), kb / 1024.0));
         }
         map
     }
