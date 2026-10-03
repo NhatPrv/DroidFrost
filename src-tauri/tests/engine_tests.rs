@@ -46,6 +46,24 @@ Total RAM: 7,842,120K (status normal)
 }
 
 #[test]
+fn test_parse_proc_meminfo() {
+    let sample_proc = r#"
+MemTotal:        3872972 kB
+MemFree:          116288 kB
+MemAvailable:     834804 kB
+Buffers:             772 kB
+Cached:           887324 kB
+SwapTotal:       3145724 kB
+SwapFree:         876356 kB
+"#;
+
+    let mem = ProcessParser::parse_proc_meminfo(sample_proc);
+    assert!(mem.total_ram_mb > 3780.0 && mem.total_ram_mb < 3790.0); // ~3.8 GB vật lý
+    assert!(mem.swap_total_mb > 3070.0 && mem.swap_total_mb < 3080.0); // ~3.1 GB Swap
+    assert!(mem.free_ram_mb > 810.0 && mem.free_ram_mb < 820.0);
+}
+
+#[test]
 fn test_parse_process_ram_table() {
     let sample_procs = r#"
 Total PSS by process:

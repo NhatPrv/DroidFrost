@@ -46,9 +46,9 @@ impl AdbExecutor {
             }
         };
 
-        match timeout(Duration::from_millis(5000), future).await {
+        match timeout(Duration::from_millis(15000), future).await {
             Ok(result) => result,
-            Err(_) => Err("Hết thời gian chờ lệnh ADB (Timeout 5000ms)".to_string()),
+            Err(_) => Err("Hết thời gian chờ lệnh ADB (Timeout 15000ms)".to_string()),
         }
     }
 

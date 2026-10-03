@@ -19,6 +19,8 @@
     used_ram_mb: 0,
     free_ram_mb: 0,
     cached_ram_mb: 0,
+    swap_total_mb: 0,
+    swap_used_mb: 0,
   };
   let processes: ProcessInfo[] = [];
 

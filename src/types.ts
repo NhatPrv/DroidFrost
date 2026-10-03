@@ -27,6 +27,8 @@ export interface SystemMemoryInfo {
   used_ram_mb: number;
   free_ram_mb: number;
   cached_ram_mb: number;
+  swap_total_mb: number;
+  swap_used_mb: number;
 }
 
 export interface OneClickBoostResult {

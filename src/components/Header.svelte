@@ -8,6 +8,8 @@
     used_ram_mb: 0,
     free_ram_mb: 0,
     cached_ram_mb: 0,
+    swap_total_mb: 0,
+    swap_used_mb: 0,
   };
   export let onSelectDevice: (serial: string) => void;
   export let onRefresh: () => void;
@@ -97,8 +99,13 @@
         </div>
         <div class="metric-sub-stats">
           <span>Khả dụng: {formatMb(memory.free_ram_mb)}</span>
-          <span>Bộ nhớ đệm: {formatMb(memory.cached_ram_mb)}</span>
-          <span>Tổng dung lượng: {formatMb(memory.total_ram_mb)}</span>
+          <span>Đệm: {formatMb(memory.cached_ram_mb)}</span>
+          <span>RAM vật lý: {formatMb(memory.total_ram_mb)}</span>
+          {#if memory.swap_total_mb > 0}
+            <span class="swap-stat" title="Bộ nhớ ảo Swap / RAM Plus của Android">
+              Swap (RAM Plus): {formatMb(memory.swap_used_mb)} / {formatMb(memory.swap_total_mb)}
+            </span>
+          {/if}
         </div>
       </div>
     </div>
@@ -275,5 +282,10 @@
     font-size: 10px;
     color: var(--text-muted);
     font-family: var(--font-mono);
+  }
+
+  .swap-stat {
+    color: var(--accent-frost);
+    font-weight: 600;
   }
 </style>

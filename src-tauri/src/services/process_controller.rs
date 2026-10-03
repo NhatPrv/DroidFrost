@@ -85,11 +85,19 @@ impl ProcessController {
             .unwrap_or_default();
         let disabled_set = ProcessParser::parse_disabled_packages(&disabled_output);
 
-        // 4. Quét dumpsys meminfo để lấy RAM hệ thống và RAM từng tiến trình
+        // 4. Quét /proc/meminfo để lấy RAM hệ thống và Swap siêu tốc (~30ms)
+        let proc_mem_output = AdbExecutor::execute_shell(serial, &["cat", "/proc/meminfo"])
+            .await
+            .unwrap_or_default();
+        let mut sys_memory = ProcessParser::parse_proc_meminfo(&proc_mem_output);
+
+        // 5. Quét dumpsys meminfo để lấy RAM từng tiến trình
         let meminfo_output = AdbExecutor::execute_shell(serial, &["dumpsys", "meminfo"])
             .await
             .unwrap_or_default();
-        let sys_memory = ProcessParser::parse_system_memory(&meminfo_output);
+        if sys_memory.total_ram_mb == 0.0 {
+            sys_memory = ProcessParser::parse_system_memory(&meminfo_output);
+        }
         let ram_map = ProcessParser::parse_process_ram_table(&meminfo_output);
 
         // Hợp nhất danh sách
