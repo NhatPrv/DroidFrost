@@ -214,10 +214,18 @@
   .status-indicator.unauthorized {
     background: var(--status-scheduled);
     box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
+    animation: pulse-warn 1.5s infinite ease-in-out;
+  }
+
+  @keyframes pulse-warn {
+    0% { transform: scale(0.9); opacity: 0.6; }
+    50% { transform: scale(1.25); opacity: 1; }
+    100% { transform: scale(0.9); opacity: 0.6; }
   }
 
   .device-pill.unauthorized-pill {
     border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.05);
   }
 
   .btn-tool {
@@ -292,5 +300,10 @@
     font-size: 10px;
     color: var(--text-muted);
     font-family: var(--font-mono);
+  }
+
+  .swap-stat {
+    color: var(--accent-frost);
+    font-weight: 600;
   }
 </style>
