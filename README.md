@@ -104,6 +104,7 @@ npm run tauri build
 - Cột ứng dụng ghi **PSS** khi Android cung cấp `dumpsys meminfo`; nếu dịch vụ đó không hoạt động, cột ghi **RSS** lấy từ `ps`. RSS tính cả trang chia sẻ nên không cộng các ứng dụng để so với RAM toàn máy.
 - Lệnh buộc dừng không bảo đảm RAM giảm đúng bằng RAM trước khi dừng. Ứng dụng tự khởi chạy lại và bộ nhớ đệm có thể thay đổi; hãy xem số đo sau khi quét lại.
 - Dừng tất cả chỉ tác động ứng dụng người dùng đang chạy. Hiển thị app hệ thống là bộ lọc xem, không mở rộng phạm vi dừng tất cả.
+- **Dừng tạm** dùng `am force-stop`: ứng dụng vẫn được bật và có thể thức dậy khi nhận tin nhắn. **Tắt hẳn** dùng `pm disable-user --user 0`: Android vô hiệu hóa ứng dụng cho đến khi bạn chọn **Bật lại**. Khi tắt hẳn Messenger, chính ứng dụng Messenger không thể chạy hay nhận thông báo trên user đó; các ứng dụng khác như Facebook vẫn hoạt động riêng.
 
 
 Dự án được phân phối dưới giấy phép mã nguồn mở **Apache License 2.0**. Xem chi tiết tại file [LICENSE](LICENSE).

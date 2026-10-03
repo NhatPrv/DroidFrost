@@ -1,6 +1,6 @@
 [package]
 name = "droidfrost"
-version = "1.0.1"
+version = "1.0.2"
 description = "Autonomous Non-Root Android App Freezer, Process Killer & Task Scheduler"
 authors = ["NhatPrv"]
 license = "Apache-2.0"

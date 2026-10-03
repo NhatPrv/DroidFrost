@@ -17,7 +17,7 @@ impl ProcessController {
         }
 
         match AdbExecutor::execute_shell(serial, &["am", "force-stop", pkg]).await {
-            Ok(_) => OperationResult::ok(&format!("Đã buộc dừng thành công ứng dụng {}", pkg)),
+            Ok(_) => OperationResult::ok(&format!("Đã dừng tạm {}. Ứng dụng có thể tự chạy lại khi nhận sự kiện.", pkg)),
             Err(e) => OperationResult::err(&format!("Lỗi khi buộc dừng {}: {}", pkg, e)),
         }
     }
@@ -33,13 +33,12 @@ impl ProcessController {
         }
 
         match AdbExecutor::execute_shell(serial, &["pm", "disable-user", "--user", "0", pkg]).await {
-            Ok(out) => {
-                if out.to_lowercase().contains("disabled-user") || out.to_lowercase().contains("success") {
-                    OperationResult::ok(&format!("Đã đóng băng thành công ứng dụng {}", pkg))
-                } else {
-                    OperationResult::ok(&format!("Đã áp dụng lệnh đóng băng {}: {}", pkg, out.trim()))
-                }
-            }
+            Ok(_) => match AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-d", "--user", "0"]).await {
+                Ok(disabled) if ProcessParser::parse_disabled_packages(&disabled).contains(pkg) =>
+                    OperationResult::ok(&format!("Đã tắt hẳn {} cho user 0; chỉ chạy lại sau khi bạn bật lại.", pkg)),
+                Ok(_) => OperationResult::err(&format!("Không xác nhận được trạng thái tắt hẳn của {}", pkg)),
+                Err(e) => OperationResult::err(&format!("Không kiểm tra được trạng thái {}: {}", pkg, e)),
+            },
             Err(e) => OperationResult::err(&format!("Lỗi khi đóng băng {}: {}", pkg, e)),
         }
     }
@@ -51,13 +50,12 @@ impl ProcessController {
         }
 
         match AdbExecutor::execute_shell(serial, &["pm", "enable", pkg]).await {
-            Ok(out) => {
-                if out.to_lowercase().contains("enabled") || out.to_lowercase().contains("success") {
-                    OperationResult::ok(&format!("Đã rã đông thành công ứng dụng {}", pkg))
-                } else {
-                    OperationResult::ok(&format!("Đã kích hoạt {}: {}", pkg, out.trim()))
-                }
-            }
+            Ok(_) => match AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-e", "--user", "0"]).await {
+                Ok(enabled) if ProcessParser::parse_disabled_packages(&enabled).contains(pkg) =>
+                    OperationResult::ok(&format!("Đã bật lại {}", pkg)),
+                Ok(_) => OperationResult::err(&format!("Không xác nhận được trạng thái bật lại của {}", pkg)),
+                Err(e) => OperationResult::err(&format!("Không kiểm tra được trạng thái {}: {}", pkg, e)),
+            },
             Err(e) => OperationResult::err(&format!("Lỗi khi rã đông {}: {}", pkg, e)),
         }
     }
@@ -76,7 +74,7 @@ impl ProcessController {
         let sys_pkgs = ProcessParser::parse_package_list(&sys_pkgs_output, true);
 
         // 3. Quét danh sách app đang bị đóng băng
-        let disabled_output = AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-d"]).await?;
+        let disabled_output = AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-d", "--user", "0"]).await?;
         let disabled_set = ProcessParser::parse_disabled_packages(&disabled_output);
 
         // 4. Quét dumpsys meminfo để lấy RAM hệ thống và RAM từng tiến trình

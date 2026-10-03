@@ -172,7 +172,7 @@
             <!-- Status Pill -->
             <td class="col-status">
               {#if p.is_frozen}
-                <span class="pill pill-frozen">Đã đóng băng</span>
+                <span class="pill pill-frozen">Đã tắt hẳn</span>
               {:else if p.is_running}
                 <span class="pill pill-running">Đang chạy</span>
               {:else}
@@ -193,9 +193,9 @@
                   <button
                     class="btn btn-danger btn-action"
                     on:click={() => onKill(p.package_name)}
-                    title="Buộc dừng ngay lập tức"
+                    title="Dừng tạm bằng force-stop; tin nhắn hoặc sự kiện khác có thể đánh thức ứng dụng"
                   >
-                    Kill
+                    Dừng tạm
                   </button>
                 {/if}
 
@@ -203,17 +203,17 @@
                   <button
                     class="btn btn-unfreeze btn-action"
                     on:click={() => onUnfreeze(p.package_name)}
-                    title="Kích hoạt lại ứng dụng"
+                    title="Cho phép ứng dụng hoạt động và nhận thông báo trở lại"
                   >
-                    Unfreeze
+                    Bật lại
                   </button>
                 {:else if !p.is_whitelisted}
                   <button
                     class="btn btn-freeze btn-action"
                     on:click={() => onFreeze(p.package_name)}
-                    title="Đóng băng ứng dụng hoàn toàn"
+                    title="Vô hiệu hóa ứng dụng cho user 0; ứng dụng không nhận thông báo cho đến khi bật lại"
                   >
-                    Freeze
+                    Tắt hẳn
                   </button>
                 {/if}
 
@@ -266,7 +266,7 @@
             selectedPkgs = new Set();
           }}
         >
-          Buộc dừng đã chọn
+          Dừng tạm đã chọn
         </button>
         <button
           class="btn btn-freeze"
@@ -275,7 +275,7 @@
             selectedPkgs = new Set();
           }}
         >
-          Đóng băng đã chọn
+          Tắt hẳn đã chọn
         </button>
         <button class="btn" on:click={() => (selectedPkgs = new Set())}>
           Bỏ chọn

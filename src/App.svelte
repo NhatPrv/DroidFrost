@@ -111,7 +111,7 @@
       const res = await api.killApp(selectedSerial, pkg);
       if (res.success) successCount++;
     }
-    showToast(`Đã buộc dừng thành công ${successCount}/${pkgs.length} ứng dụng.`);
+    showToast(`Đã dừng tạm ${successCount}/${pkgs.length} ứng dụng; chúng có thể tự chạy lại.`);
     await refreshState();
   }
 
@@ -121,7 +121,7 @@
       const res = await api.freezeApp(selectedSerial, pkg);
       if (res.success) successCount++;
     }
-    showToast(`Đã đóng băng thành công ${successCount}/${pkgs.length} ứng dụng.`);
+    showToast(`Đã tắt hẳn ${successCount}/${pkgs.length} ứng dụng cho đến khi bạn bật lại.`);
     await refreshState();
   }
 
