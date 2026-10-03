@@ -45,15 +45,17 @@
     <!-- Active Device Selector -->
     <div class="device-dock">
       {#if devices.length > 0}
-        <div class="device-pill">
-          <span class="status-indicator online"></span>
+        <div class="device-pill" class:unauthorized-pill={currentDevice?.status === 'Unauthorized'}>
+          <span
+            class="status-indicator {currentDevice?.status === 'Device' ? 'online' : currentDevice?.status === 'Unauthorized' ? 'unauthorized' : 'offline'}"
+          ></span>
           <select
             value={selectedSerial}
             on:change={(e) => onSelectDevice(e.currentTarget.value)}
           >
             {#each devices as d}
               <option value={d.serial}>
-                {d.model} ({d.serial}) • {d.connection_type}
+                {d.model} ({d.serial}) • {d.connection_type} {d.status === 'Unauthorized' ? '⚠️ [Chờ cấp quyền]' : ''}
               </option>
             {/each}
           </select>
@@ -204,6 +206,23 @@
   .status-indicator.online {
     background: var(--status-running);
     box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+  }
+
+  .status-indicator.unauthorized {
+    background: var(--status-scheduled);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
+    animation: pulse-warn 1.5s infinite ease-in-out;
+  }
+
+  @keyframes pulse-warn {
+    0% { transform: scale(0.9); opacity: 0.6; }
+    50% { transform: scale(1.25); opacity: 1; }
+    100% { transform: scale(0.9); opacity: 0.6; }
+  }
+
+  .device-pill.unauthorized-pill {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.05);
   }
 
   .status-indicator.offline {

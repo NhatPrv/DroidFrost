@@ -10,6 +10,8 @@
   export let onCancelSchedule: (pkg: string) => void;
   export let onBatchKill: (packages: string[]) => void;
   export let onBatchFreeze: (packages: string[]) => void;
+  export let currentDevice: import('../types').DeviceInfo | undefined = undefined;
+  export let onRefresh: (() => void) | undefined = undefined;
 
   let selectedPkgs: Set<string> = new Set();
   let sortField: 'ram' | 'name' = 'ram';
@@ -95,7 +97,48 @@
       </tr>
     </thead>
     <tbody>
-      {#if sortedProcesses.length === 0}
+      {#if currentDevice?.status === 'Unauthorized'}
+        <tr>
+          <td colspan="6" class="empty-cell">
+            <div class="unauthorized-state">
+              <div class="unauthorized-icon-wrap">
+                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="M12 8v4M12 16h.01"/>
+                </svg>
+              </div>
+              <span class="unauthorized-title">Cần cấp quyền gỡ lỗi USB (Allow USB Debugging)</span>
+              <p class="unauthorized-desc">
+                Điện thoại <strong>{currentDevice.model} ({currentDevice.serial})</strong> đang chờ xác nhận bảo mật từ máy tính này.
+              </p>
+
+              <div class="steps-box">
+                <div class="step-row">
+                  <span class="step-num">1</span>
+                  <span class="step-text">Mở khóa màn hình điện thoại <strong>{currentDevice.model}</strong></span>
+                </div>
+                <div class="step-row">
+                  <span class="step-num">2</span>
+                  <span class="step-text">Tìm thông báo xuất hiện: <em>"Cho phép gỡ lỗi USB?" (Allow USB debugging?)</em></span>
+                </div>
+                <div class="step-row">
+                  <span class="step-num">3</span>
+                  <span class="step-text">Tích chọn <strong>"Luôn cho phép từ máy tính này"</strong> rồi bấm <strong>"Cho phép" (Allow)</strong></span>
+                </div>
+              </div>
+
+              {#if onRefresh}
+                <button class="btn btn-unauthorized-refresh" on:click={onRefresh}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                  </svg>
+                  Tôi đã bấm Cho phép, Quét lại ngay
+                </button>
+              {/if}
+            </div>
+          </td>
+        </tr>
+      {:else if sortedProcesses.length === 0}
         <tr>
           <td colspan="6" class="empty-cell">
             <div class="empty-state">
@@ -488,7 +531,102 @@
 
   .empty-cell {
     text-align: center;
-    padding: 60px 20px;
+    padding: 40px 20px;
+  }
+
+  .unauthorized-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 24px;
+    background: rgba(245, 158, 11, 0.04);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: var(--radius-lg);
+  }
+
+  .unauthorized-icon-wrap {
+    color: var(--status-scheduled);
+    background: rgba(245, 158, 11, 0.12);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .unauthorized-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f59e0b;
+  }
+
+  .unauthorized-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    text-align: center;
+  }
+
+  .steps-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+  }
+
+  .step-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .step-num {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    font-weight: 700;
+    font-size: 11px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .step-text {
+    font-size: 12px;
+    color: var(--text-primary);
+  }
+
+  .btn-unauthorized-refresh {
+    margin-top: 6px;
+    background: #f59e0b;
+    color: #000;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+
+  .btn-unauthorized-refresh:hover {
+    background: #d97706;
+    transform: translateY(-1px);
   }
 
   .empty-state {

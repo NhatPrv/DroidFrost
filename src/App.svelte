@@ -45,10 +45,17 @@
 
   async function loadDevices() {
     try {
+      const prevDevice = devices.find(d => d.serial === selectedSerial);
       devices = await api.getDevices();
-      if (devices.length > 0 && (!selectedSerial || !devices.some(d => d.serial === selectedSerial))) {
-        selectedSerial = devices[0].serial;
-        await refreshState();
+      if (devices.length > 0) {
+        if (!selectedSerial || !devices.some(d => d.serial === selectedSerial)) {
+          selectedSerial = devices[0].serial;
+        }
+        const currDevice = devices.find(d => d.serial === selectedSerial);
+        // Tự động nạp RAM & tiến trình ngay khi thiết bị được cấp quyền (Authorize)
+        if (currDevice?.status === 'Device' && (prevDevice?.status !== 'Device' || processes.length === 0)) {
+          await refreshState();
+        }
       }
     } catch (e: any) {
       console.error('Lỗi nạp thiết bị:', e);
@@ -165,6 +172,7 @@
     return true;
   });
 
+  $: currentDevice = devices.find((d) => d.serial === selectedSerial);
   $: countAll = processes.filter(p => showSystemApps || !p.is_system).length;
   $: countRunning = processes.filter(p => p.is_running && (showSystemApps || !p.is_system)).length;
   $: countFrozen = processes.filter(p => p.is_frozen && (showSystemApps || !p.is_system)).length;
@@ -172,9 +180,12 @@
 
   onMount(() => {
     loadDevices();
-    pollInterval = setInterval(() => {
-      refreshState();
-    }, 4000);
+    pollInterval = setInterval(async () => {
+      await loadDevices();
+      if (currentDevice?.status === 'Device') {
+        await refreshState();
+      }
+    }, 3000);
   });
 
   onDestroy(() => {
@@ -193,9 +204,9 @@
       selectedSerial = serial;
       refreshState();
     }}
-    onRefresh={() => {
-      loadDevices();
-      refreshState();
+    onRefresh={async () => {
+      await loadDevices();
+      await refreshState();
     }}
     onOpenWirelessModal={() => (isWirelessModalOpen = true)}
   />
@@ -220,6 +231,11 @@
   <!-- Main Content Process Table -->
   <ProcessTable
     processes={filteredProcesses}
+    {currentDevice}
+    onRefresh={async () => {
+      await loadDevices();
+      await refreshState();
+    }}
     onKill={handleKill}
     onFreeze={handleFreeze}
     onUnfreeze={handleUnfreeze}
