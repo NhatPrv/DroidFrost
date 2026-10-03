@@ -21,6 +21,7 @@
     cached_ram_mb: 0,
     swap_total_mb: 0,
     swap_used_mb: 0,
+    process_metric: 'PSS',
   };
   let processes: ProcessInfo[] = [];
 
@@ -34,6 +35,7 @@
   let toastMessage: string = '';
   let toastTimeout: any = null;
   let pollInterval: any = null;
+  let refreshInFlight = false;
 
   function showToast(msg: string) {
     toastMessage = msg;
@@ -45,17 +47,14 @@
 
   async function loadDevices() {
     try {
-      const prevDevice = devices.find(d => d.serial === selectedSerial);
+      const previous = devices.find(d => d.serial === selectedSerial);
       devices = await api.getDevices();
-      if (devices.length > 0) {
-        if (!selectedSerial || !devices.some(d => d.serial === selectedSerial)) {
-          selectedSerial = devices[0].serial;
-        }
-        const currDevice = devices.find(d => d.serial === selectedSerial);
-        // Tự động nạp RAM & tiến trình ngay khi thiết bị được cấp quyền (Authorize)
-        if (currDevice?.status === 'Device' && (prevDevice?.status !== 'Device' || processes.length === 0)) {
-          await refreshState();
-        }
+      if (devices.length > 0 && (!selectedSerial || !devices.some(d => d.serial === selectedSerial))) {
+        selectedSerial = devices[0].serial;
+      }
+      const current = devices.find(d => d.serial === selectedSerial);
+      if (current?.status === 'Device' && (previous?.status !== 'Device' || processes.length === 0)) {
+        await refreshState();
       }
     } catch (e: any) {
       console.error('Lỗi nạp thiết bị:', e);
@@ -63,13 +62,20 @@
   }
 
   async function refreshState() {
-    if (!selectedSerial) return;
+    if (!selectedSerial || refreshInFlight) return;
+    const serial = selectedSerial;
+    refreshInFlight = true;
     try {
-      const [mem, procs] = await api.getDeviceState(selectedSerial);
-      memory = mem;
-      processes = procs;
+      const [mem, procs] = await api.getDeviceState(serial);
+      if (serial === selectedSerial) {
+        memory = mem;
+        processes = procs;
+      }
     } catch (e: any) {
       console.error('Lỗi cập nhật trạng thái:', e);
+      showToast(`Không đọc được trạng thái thiết bị: ${e}`);
+    } finally {
+      refreshInFlight = false;
     }
   }
 
@@ -111,7 +117,7 @@
       const res = await api.killApp(selectedSerial, pkg);
       if (res.success) successCount++;
     }
-    showToast(`Đã buộc dừng thành công ${successCount}/${pkgs.length} ứng dụng.`);
+    showToast(`Đã dừng tạm ${successCount}/${pkgs.length} ứng dụng; chúng có thể tự chạy lại.`);
     await refreshState();
   }
 
@@ -121,7 +127,7 @@
       const res = await api.freezeApp(selectedSerial, pkg);
       if (res.success) successCount++;
     }
-    showToast(`Đã đóng băng thành công ${successCount}/${pkgs.length} ứng dụng.`);
+    showToast(`Đã tắt hẳn ${successCount}/${pkgs.length} ứng dụng cho đến khi bạn bật lại.`);
     await refreshState();
   }
 
@@ -129,7 +135,7 @@
     isBoosting = true;
     try {
       const res = await api.oneClickBoost(selectedSerial);
-      showToast(`One-Click Boost: Đã dừng ${res.killed_count} ứng dụng, giải phóng ${res.freed_ram_mb} MB RAM!`);
+      showToast(`Đã gửi lệnh dừng cho ${res.killed_count} ứng dụng. RAM đang được đo lại.`);
       await refreshState();
     } catch (e: any) {
       showToast('Lỗi khi thực hiện boost: ' + e);
@@ -142,8 +148,8 @@
     if (!selectedSerial) return;
     isStoppingAll = true;
     try {
-      const res = await api.stopAllRunning(selectedSerial, showSystemApps);
-      showToast(`Đã dừng thành công ${res.killed_count} tiến trình đang chạy, giải phóng ${res.freed_ram_mb} MB RAM!`);
+      const res = await api.stopAllRunning(selectedSerial, false);
+      showToast(`Đã gửi lệnh dừng cho ${res.killed_count} ứng dụng. RAM đang được đo lại.`);
       await refreshState();
     } catch (e: any) {
       showToast('Lỗi khi dừng các tiến trình: ' + e);
@@ -172,9 +178,10 @@
     return true;
   });
 
-  $: currentDevice = devices.find((d) => d.serial === selectedSerial);
+  $: currentDevice = devices.find(d => d.serial === selectedSerial);
   $: countAll = processes.filter(p => showSystemApps || !p.is_system).length;
   $: countRunning = processes.filter(p => p.is_running && (showSystemApps || !p.is_system)).length;
+  $: countStoppable = processes.filter(p => p.is_running && !p.is_system && !p.is_whitelisted).length;
   $: countFrozen = processes.filter(p => p.is_frozen && (showSystemApps || !p.is_system)).length;
   $: countScheduled = processes.filter(p => p.is_scheduled && (showSystemApps || !p.is_system)).length;
 
@@ -182,10 +189,8 @@
     loadDevices();
     pollInterval = setInterval(async () => {
       await loadDevices();
-      if (currentDevice?.status === 'Device') {
-        await refreshState();
-      }
-    }, 3000);
+      if (currentDevice?.status === 'Device') await refreshState();
+    }, 4000);
   });
 
   onDestroy(() => {
@@ -218,6 +223,7 @@
     bind:searchQuery
     {countAll}
     {countRunning}
+    {countStoppable}
     {countFrozen}
     {countScheduled}
     {isBoosting}
@@ -236,6 +242,7 @@
       await loadDevices();
       await refreshState();
     }}
+    processMetric={memory.process_metric}
     onKill={handleKill}
     onFreeze={handleFreeze}
     onUnfreeze={handleUnfreeze}

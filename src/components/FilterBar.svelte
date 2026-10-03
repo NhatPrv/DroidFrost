@@ -6,6 +6,7 @@
   export let searchQuery: string = '';
   export let countAll: number = 0;
   export let countRunning: number = 0;
+  export let countStoppable: number = 0;
   export let countFrozen: number = 0;
   export let countScheduled: number = 0;
   export let isBoosting: boolean = false;
@@ -43,7 +44,7 @@
       on:click={() => onTabChange('frozen')}
     >
       <span class="dot frozen"></span>
-      Đã đóng băng <span class="badge-num">{countFrozen}</span>
+      Đã tắt hẳn <span class="badge-num">{countFrozen}</span>
     </button>
 
     <button
@@ -88,13 +89,13 @@
     <button
       class="btn btn-danger stop-all-action"
       on:click={onStopAllRunning}
-      disabled={isStoppingAll || countRunning === 0}
-      title="Buộc dừng ngay lập tức toàn bộ {countRunning} ứng dụng đang chạy nền"
+      disabled={isStoppingAll || countStoppable === 0}
+      title="Chỉ dừng tạm ứng dụng người dùng; ứng dụng có thể tự chạy lại"
     >
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="5" y="5" width="14" height="14" rx="2"/>
       </svg>
-      {isStoppingAll ? 'Đang dừng...' : `Dừng tất cả (${countRunning})`}
+      {isStoppingAll ? 'Đang dừng...' : `Dừng tạm tất cả (${countStoppable})`}
     </button>
 
     <!-- Clean Boost Action -->
@@ -102,12 +103,12 @@
       class="btn btn-primary boost-action"
       on:click={onOneClickBoost}
       disabled={isBoosting}
-      title="Buộc dừng toàn bộ ứng dụng người dùng chạy nền để thu hồi RAM"
+      title="Dừng tạm ứng dụng người dùng đang chạy để thu hồi RAM; ứng dụng có thể tự chạy lại"
     >
       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
       </svg>
-      {isBoosting ? 'Đang giải phóng...' : 'One-Click Boost'}
+      {isBoosting ? 'Đang dọn RAM...' : 'Dọn RAM tạm'}
     </button>
   </div>
 </div>

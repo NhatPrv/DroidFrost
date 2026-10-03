@@ -87,83 +87,20 @@ impl ProcessParser {
         disabled
     }
 
-    /// Phân tích RAM và Swap trực tiếp từ `/proc/meminfo` (tốc độ ~30ms và chính xác 100%)
-    pub fn parse_proc_meminfo(output: &str) -> SystemMemoryInfo {
-        let mut mem_total_kb = 0.0;
-        let mut mem_free_kb = 0.0;
-        let mut mem_available_kb = 0.0;
-        let mut cached_kb = 0.0;
-        let mut swap_total_kb = 0.0;
-        let mut swap_free_kb = 0.0;
-
-        for line in output.lines() {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 2 {
-                let key = parts[0].trim_end_matches(':');
-                if let Ok(val) = parts[1].parse::<f64>() {
-                    match key {
-                        "MemTotal" => mem_total_kb = val,
-                        "MemFree" => mem_free_kb = val,
-                        "MemAvailable" => mem_available_kb = val,
-                        "Cached" => cached_kb = val,
-                        "SwapTotal" => swap_total_kb = val,
-                        "SwapFree" => swap_free_kb = val,
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        let total_ram_mb = (mem_total_kb / 1024.0 * 10.0).round() / 10.0;
-        let free_ram_mb = if mem_available_kb > 0.0 {
-            (mem_available_kb / 1024.0 * 10.0).round() / 10.0
-        } else {
-            ((mem_free_kb + cached_kb) / 1024.0 * 10.0).round() / 10.0
-        };
-        let used_ram_mb = (total_ram_mb - free_ram_mb).max(0.0);
-        let cached_ram_mb = (cached_kb / 1024.0 * 10.0).round() / 10.0;
-
-        let swap_total_mb = (swap_total_kb / 1024.0 * 10.0).round() / 10.0;
-        let swap_used_mb = ((swap_total_kb - swap_free_kb).max(0.0) / 1024.0 * 10.0).round() / 10.0;
-
-        SystemMemoryInfo {
-            total_ram_mb,
-            used_ram_mb,
-            free_ram_mb,
-            cached_ram_mb,
-            swap_total_mb,
-            swap_used_mb,
-        }
-    }
-
-    /// Phân tích RAM toàn hệ thống từ `dumpsys meminfo`
+    /// Read physical RAM from /proc/meminfo. MemAvailable includes reclaimable cache.
     pub fn parse_system_memory(output: &str) -> SystemMemoryInfo {
-        lazy_static::lazy_static! {
-            static ref RE_TOTAL: Regex = Regex::new(r"Total RAM:\s*([\d,]+)K").unwrap();
-            static ref RE_FREE: Regex = Regex::new(r"Free RAM:\s*([\d,]+)K").unwrap();
-            static ref RE_USED: Regex = Regex::new(r"Used RAM:\s*([\d,]+)K").unwrap();
-            static ref RE_ZRAM: Regex = Regex::new(r"ZRAM:\s*([\d,]+)K physical used for ([\d,]+)K in swap \(([\d,]+)K total swap\)").unwrap();
-        }
-
-        let parse_kb = |re: &Regex, text: &str, group: usize| -> f64 {
-            if let Some(caps) = re.captures(text) {
-                if let Some(m) = caps.get(group) {
-                    let num_str = m.as_str().replace(',', "");
-                    if let Ok(val) = num_str.parse::<f64>() {
-                        return (val / 1024.0 * 10.0).round() / 10.0; // Chuyển KB sang MB
-                    }
-                }
-            }
-            0.0
+        let field = |name: &str| -> f64 {
+            output.lines().find_map(|line| {
+                let value = line.strip_prefix(name)?.trim().split_whitespace().next()?;
+                value.parse::<f64>().ok().map(|kb| kb / 1024.0)
+            }).unwrap_or(0.0)
         };
-
-        let total_ram_mb = parse_kb(&RE_TOTAL, output, 1);
-        let free_ram_mb = parse_kb(&RE_FREE, output, 1);
-        let used_ram_mb = parse_kb(&RE_USED, output, 1);
-        let cached_ram_mb = (total_ram_mb - used_ram_mb - free_ram_mb).max(0.0);
-
-        let swap_used_mb = parse_kb(&RE_ZRAM, output, 2);
-        let swap_total_mb = parse_kb(&RE_ZRAM, output, 3);
+        let total_ram_mb = field("MemTotal:");
+        let free_ram_mb = field("MemAvailable:");
+        let cached_ram_mb = field("Cached:") + field("Buffers:") + field("SReclaimable:");
+        let used_ram_mb = (total_ram_mb - free_ram_mb).max(0.0);
+        let swap_total_mb = field("SwapTotal:");
+        let swap_used_mb = (swap_total_mb - field("SwapFree:")).max(0.0);
 
         SystemMemoryInfo {
             total_ram_mb,
@@ -172,10 +109,11 @@ impl ProcessParser {
             cached_ram_mb,
             swap_total_mb,
             swap_used_mb,
+            process_metric: "PSS".to_string(),
         }
     }
 
-    /// Phân tích chi tiết RAM và tiến trình từ `dumpsys meminfo` (chống lặp section OOM/RSS)
+    /// Phân tích chi tiết RAM và tiến trình từ `dumpsys meminfo`
     pub fn parse_process_ram_table(output: &str) -> HashMap<String, (Option<u32>, f64)> {
         lazy_static::lazy_static! {
             // Định dạng: 215,680K: com.facebook.katana (pid 14522)
@@ -184,52 +122,24 @@ impl ProcessParser {
             ).unwrap();
         }
 
-        let mut map: HashMap<String, (Option<u32>, f64)> = HashMap::new();
-        let mut seen_pids: HashSet<u32> = HashSet::new();
-
-        let has_pss_section = output.contains("Total PSS by process:");
-        let has_rss_section = output.contains("Total RSS by process:");
-
-        let mut in_target_section = !has_pss_section && !has_rss_section;
-
+        let mut map = HashMap::new();
+        let mut in_process_section = false;
+        let mut seen_pids = HashSet::new();
         for line in output.lines() {
-            let trimmed = line.trim();
-
-            if has_pss_section {
-                if trimmed.starts_with("Total PSS by process:") {
-                    in_target_section = true;
-                    continue;
-                } else if in_target_section && (trimmed.starts_with("Total PSS by OOM")
-                    || trimmed.starts_with("Total PSS by category")
-                    || trimmed.starts_with("Total RAM:")) {
-                    break;
-                }
-            } else if has_rss_section {
-                if trimmed.starts_with("Total RSS by process:") {
-                    in_target_section = true;
-                    continue;
-                } else if in_target_section && (trimmed.starts_with("Total RSS by OOM")
-                    || trimmed.starts_with("Total RSS by category")
-                    || trimmed.starts_with("Total RAM:")) {
-                    break;
-                }
-            }
-
-            if !in_target_section {
+            if line.trim() == "Total PSS by process:" {
+                in_process_section = true;
                 continue;
             }
-
+            if in_process_section && (line.trim().is_empty() || line.trim().starts_with("Total PSS by ")) {
+                break;
+            }
+            if !in_process_section { continue; }
             if let Some(caps) = RE_LINE.captures(line) {
                 let ram_kb_str = caps.get(1).map_or("0", |m| m.as_str()).replace(',', "");
                 let full_pkg = caps.get(2).map_or("", |m| m.as_str());
                 let pid = caps.get(3).and_then(|m| m.as_str().parse::<u32>().ok());
-
-                // Nếu PID này đã được tính thì bỏ qua để chống lặp
-                if let Some(p) = pid {
-                    if seen_pids.contains(&p) {
-                        continue;
-                    }
-                    seen_pids.insert(p);
+                if let Some(pid) = pid {
+                    if !seen_pids.insert(pid) { continue; }
                 }
 
                 // Tách package chính nếu có sub-process dạng "com.pkg:service"
@@ -239,7 +149,7 @@ impl ProcessParser {
                     let mb = (kb / 1024.0 * 10.0).round() / 10.0;
                     map.entry(pkg_name)
                         .and_modify(|entry: &mut (Option<u32>, f64)| {
-                            entry.1 = ((entry.1 + mb) * 10.0).round() / 10.0;
+                            entry.1 += mb;
                             if entry.0.is_none() && pid.is_some() {
                                 entry.0 = pid;
                             }
@@ -247,6 +157,22 @@ impl ProcessParser {
                         .or_insert((pid, mb));
                 }
             }
+        }
+        map
+    }
+
+    /// ps RSS is a fallback: shared pages are counted in every process.
+    pub fn parse_ps_rss(output: &str) -> HashMap<String, (Option<u32>, f64)> {
+        let mut map = HashMap::new();
+        for line in output.lines().skip(1) {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            if fields.len() < 3 { continue; }
+            let (Ok(pid), Ok(kb)) = (fields[0].parse::<u32>(), fields[fields.len()-1].parse::<f64>()) else { continue; };
+            let name = fields[1].split(':').next().unwrap_or(fields[1]);
+            if !name.contains('.') { continue; }
+            map.entry(name.to_string())
+                .and_modify(|entry: &mut (Option<u32>, f64)| entry.1 += kb / 1024.0)
+                .or_insert((Some(pid), kb / 1024.0));
         }
         map
     }

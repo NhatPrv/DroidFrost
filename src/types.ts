@@ -14,11 +14,11 @@ export interface ProcessInfo {
   package_name: string;
   app_name: string;
   ram_mb: number;
-  is_running: bool;
-  is_frozen: bool;
-  is_scheduled: bool;
-  is_system: bool;
-  is_whitelisted: bool;
+  is_running: boolean;
+  is_frozen: boolean;
+  is_scheduled: boolean;
+  is_system: boolean;
+  is_whitelisted: boolean;
   scheduled_remaining_seconds: number | null;
 }
 
@@ -29,6 +29,7 @@ export interface SystemMemoryInfo {
   cached_ram_mb: number;
   swap_total_mb: number;
   swap_used_mb: number;
+  process_metric: 'PSS' | 'RSS';
 }
 
 export interface OneClickBoostResult {

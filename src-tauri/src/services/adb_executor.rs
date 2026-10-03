@@ -15,7 +15,7 @@ impl AdbExecutor {
         !pkg.trim().is_empty() && RE.is_match(pkg)
     }
 
-    /// Thực thi lệnh ADB nguyên bản với cơ chế Timeout 5000ms
+    /// Thực thi lệnh ADB nguyên bản với timeout đủ cho dumpsys trên máy chậm.
     pub async fn execute_raw(args: &[&str]) -> Result<String, String> {
         let mut cmd = Command::new("adb");
         cmd.args(args);
@@ -34,10 +34,10 @@ impl AdbExecutor {
                     Ok(output) => {
                         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
                         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                        if output.status.success() {
+                        if output.status.success() && !stdout.starts_with("Can't find service:") && !stdout.starts_with("Error dumping service info") {
                             Ok(stdout)
                         } else {
-                            Err(format!("ADB Error ({}): {}", output.status, stderr.trim()))
+                            Err(format!("ADB Error ({}): {} {}", output.status, stderr.trim(), stdout.trim()))
                         }
                     }
                     Err(e) => Err(format!("Lỗi chờ tiến trình ADB: {}", e)),
@@ -46,9 +46,9 @@ impl AdbExecutor {
             }
         };
 
-        match timeout(Duration::from_millis(15000), future).await {
+        match timeout(Duration::from_secs(20), future).await {
             Ok(result) => result,
-            Err(_) => Err("Hết thời gian chờ lệnh ADB (Timeout 15000ms)".to_string()),
+            Err(_) => Err("Hết thời gian chờ lệnh ADB (20 giây)".to_string()),
         }
     }
 

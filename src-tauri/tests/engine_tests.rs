@@ -33,34 +33,15 @@ RFCT40ABCDE            device product:r8qxxx model:SM_G780G device:r8q transport
 
 #[test]
 fn test_parse_system_memory() {
-    let sample_meminfo = r#"
-Total RAM: 7,842,120K (status normal)
- Free RAM: 3,214,560K (  984,200K cached pss + 1,820,360K cached kernel +   410,000K free)
- Used RAM: 4,627,560K (3,520,120K used pss + 1,107,440K kernel)
-"#;
+    let sample_meminfo = "MemTotal: 7842120 kB\nMemAvailable: 3214560 kB\nCached: 1000000 kB\nBuffers: 2000 kB\nSwapTotal: 2048000 kB\nSwapFree: 1024000 kB\n";
 
     let mem = ProcessParser::parse_system_memory(sample_meminfo);
     assert!(mem.total_ram_mb > 7600.0 && mem.total_ram_mb < 7700.0);
     assert!(mem.free_ram_mb > 3100.0 && mem.free_ram_mb < 3200.0);
     assert!(mem.used_ram_mb > 4500.0 && mem.used_ram_mb < 4600.0);
-}
-
-#[test]
-fn test_parse_proc_meminfo() {
-    let sample_proc = r#"
-MemTotal:        3872972 kB
-MemFree:          116288 kB
-MemAvailable:     834804 kB
-Buffers:             772 kB
-Cached:           887324 kB
-SwapTotal:       3145724 kB
-SwapFree:         876356 kB
-"#;
-
-    let mem = ProcessParser::parse_proc_meminfo(sample_proc);
-    assert!(mem.total_ram_mb > 3780.0 && mem.total_ram_mb < 3790.0); // ~3.8 GB vật lý
-    assert!(mem.swap_total_mb > 3070.0 && mem.swap_total_mb < 3080.0); // ~3.1 GB Swap
-    assert!(mem.free_ram_mb > 810.0 && mem.free_ram_mb < 820.0);
+    assert_eq!(mem.swap_total_mb, 2000.0);
+    assert_eq!(mem.swap_used_mb, 1000.0);
+    assert_eq!(ProcessParser::parse_system_memory("").total_ram_mb, 0.0);
 }
 
 #[test]
@@ -70,6 +51,9 @@ Total PSS by process:
     215,680K: com.facebook.katana (pid 14522)
     124,320K: com.zing.zalo (pid 18901)
      45,100K: com.android.systemui:screenshot (pid 2411)
+
+Total PSS by OOM adjustment:
+    215,680K: com.facebook.katana (pid 14522)
 "#;
 
     let map = ProcessParser::parse_process_ram_table(sample_procs);
@@ -85,26 +69,21 @@ Total PSS by process:
 }
 
 #[test]
-fn test_parse_process_ram_table_deduplication() {
-    let multi_section_procs = r#"
-Total RSS by process:
-    170,000K: com.instagram.android (pid 11624)
-Total RSS by OOM adjustment:
-    170,000K: com.instagram.android (pid 11624)
-Total PSS by process:
-    173,879K: com.instagram.android (pid 11624)
-Total PSS by OOM adjustment:
-    173,879K: com.instagram.android (pid 11624)
-Total RAM: 3,872,972K
-"#;
-
-    let map = ProcessParser::parse_process_ram_table(multi_section_procs);
+fn test_parse_ps_rss_fallback() {
+    let ps = "PID NAME RSS\n14091 com.facebook.katana 183000\n14092 com.facebook.katana:service 12000\n100 surfaceflinger 33000\n";
+    let map = ProcessParser::parse_ps_rss(ps);
     assert_eq!(map.len(), 1);
+    assert_eq!(map["com.facebook.katana"].0, Some(14091));
+    assert!((map["com.facebook.katana"].1 - 190.4296875).abs() < 0.01);
+}
 
-    let ig = map.get("com.instagram.android").unwrap();
-    assert_eq!(ig.0, Some(11624));
-    // Phải lấy đúng ~169.8 MB của PSS, tuyệt đối không bị cộng dồn thành 670 MB
-    assert!(ig.1 > 169.0 && ig.1 < 171.0);
+#[test]
+fn test_process_pss_is_not_counted_again_in_oom_section() {
+    let output = "Total RSS by process:\n170,000K: com.instagram.android (pid 11624)\nTotal PSS by process:\n173,879K: com.instagram.android (pid 11624)\nTotal PSS by OOM adjustment:\n173,879K: com.instagram.android (pid 11624)\n";
+    let map = ProcessParser::parse_process_ram_table(output);
+    assert_eq!(map.len(), 1);
+    assert_eq!(map["com.instagram.android"].0, Some(11624));
+    assert!((map["com.instagram.android"].1 - 169.8).abs() < 0.1);
 }
 
 #[test]

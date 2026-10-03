@@ -10,6 +10,7 @@
     cached_ram_mb: 0,
     swap_total_mb: 0,
     swap_used_mb: 0,
+    process_metric: 'PSS',
   };
   export let onSelectDevice: (serial: string) => void;
   export let onRefresh: () => void;
@@ -46,9 +47,7 @@
     <div class="device-dock">
       {#if devices.length > 0}
         <div class="device-pill" class:unauthorized-pill={currentDevice?.status === 'Unauthorized'}>
-          <span
-            class="status-indicator {currentDevice?.status === 'Device' ? 'online' : currentDevice?.status === 'Unauthorized' ? 'unauthorized' : 'offline'}"
-          ></span>
+          <span class="status-indicator {currentDevice?.status === 'Device' ? 'online' : currentDevice?.status === 'Unauthorized' ? 'unauthorized' : 'offline'}"></span>
           <select
             value={selectedSerial}
             on:change={(e) => onSelectDevice(e.currentTarget.value)}
@@ -101,8 +100,8 @@
         </div>
         <div class="metric-sub-stats">
           <span>Khả dụng: {formatMb(memory.free_ram_mb)}</span>
-          <span>Đệm: {formatMb(memory.cached_ram_mb)}</span>
-          <span>RAM vật lý: {formatMb(memory.total_ram_mb)}</span>
+          <span>Đệm tệp (tham khảo): {formatMb(memory.cached_ram_mb)}</span>
+          <span>Tổng dung lượng: {formatMb(memory.total_ram_mb)}</span>
           {#if memory.swap_total_mb > 0}
             <span class="swap-stat" title="Bộ nhớ ảo Swap / RAM Plus của Android">
               Swap (RAM Plus): {formatMb(memory.swap_used_mb)} / {formatMb(memory.swap_total_mb)}
@@ -208,25 +207,17 @@
     box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
   }
 
+  .status-indicator.offline {
+    background: var(--status-danger);
+  }
+
   .status-indicator.unauthorized {
     background: var(--status-scheduled);
     box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
-    animation: pulse-warn 1.5s infinite ease-in-out;
-  }
-
-  @keyframes pulse-warn {
-    0% { transform: scale(0.9); opacity: 0.6; }
-    50% { transform: scale(1.25); opacity: 1; }
-    100% { transform: scale(0.9); opacity: 0.6; }
   }
 
   .device-pill.unauthorized-pill {
     border-color: rgba(245, 158, 11, 0.4);
-    background: rgba(245, 158, 11, 0.05);
-  }
-
-  .status-indicator.offline {
-    background: var(--status-danger);
   }
 
   .btn-tool {
@@ -301,10 +292,5 @@
     font-size: 10px;
     color: var(--text-muted);
     font-family: var(--font-mono);
-  }
-
-  .swap-stat {
-    color: var(--accent-frost);
-    font-weight: 600;
   }
 </style>
