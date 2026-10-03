@@ -175,7 +175,7 @@ impl ProcessParser {
         }
     }
 
-    /// Phân tích chi tiết RAM và tiến trình từ `dumpsys meminfo`
+    /// Phân tích chi tiết RAM và tiến trình từ `dumpsys meminfo` (chống lặp section OOM/RSS)
     pub fn parse_process_ram_table(output: &str) -> HashMap<String, (Option<u32>, f64)> {
         lazy_static::lazy_static! {
             // Định dạng: 215,680K: com.facebook.katana (pid 14522)
@@ -184,12 +184,53 @@ impl ProcessParser {
             ).unwrap();
         }
 
-        let mut map = HashMap::new();
+        let mut map: HashMap<String, (Option<u32>, f64)> = HashMap::new();
+        let mut seen_pids: HashSet<u32> = HashSet::new();
+
+        let has_pss_section = output.contains("Total PSS by process:");
+        let has_rss_section = output.contains("Total RSS by process:");
+
+        let mut in_target_section = !has_pss_section && !has_rss_section;
+
         for line in output.lines() {
+            let trimmed = line.trim();
+
+            if has_pss_section {
+                if trimmed.starts_with("Total PSS by process:") {
+                    in_target_section = true;
+                    continue;
+                } else if in_target_section && (trimmed.starts_with("Total PSS by OOM")
+                    || trimmed.starts_with("Total PSS by category")
+                    || trimmed.starts_with("Total RAM:")) {
+                    break;
+                }
+            } else if has_rss_section {
+                if trimmed.starts_with("Total RSS by process:") {
+                    in_target_section = true;
+                    continue;
+                } else if in_target_section && (trimmed.starts_with("Total RSS by OOM")
+                    || trimmed.starts_with("Total RSS by category")
+                    || trimmed.starts_with("Total RAM:")) {
+                    break;
+                }
+            }
+
+            if !in_target_section {
+                continue;
+            }
+
             if let Some(caps) = RE_LINE.captures(line) {
                 let ram_kb_str = caps.get(1).map_or("0", |m| m.as_str()).replace(',', "");
                 let full_pkg = caps.get(2).map_or("", |m| m.as_str());
                 let pid = caps.get(3).and_then(|m| m.as_str().parse::<u32>().ok());
+
+                // Nếu PID này đã được tính thì bỏ qua để chống lặp
+                if let Some(p) = pid {
+                    if seen_pids.contains(&p) {
+                        continue;
+                    }
+                    seen_pids.insert(p);
+                }
 
                 // Tách package chính nếu có sub-process dạng "com.pkg:service"
                 let pkg_name = full_pkg.split(':').next().unwrap_or(full_pkg).to_string();
@@ -198,7 +239,7 @@ impl ProcessParser {
                     let mb = (kb / 1024.0 * 10.0).round() / 10.0;
                     map.entry(pkg_name)
                         .and_modify(|entry: &mut (Option<u32>, f64)| {
-                            entry.1 += mb;
+                            entry.1 = ((entry.1 + mb) * 10.0).round() / 10.0;
                             if entry.0.is_none() && pid.is_some() {
                                 entry.0 = pid;
                             }

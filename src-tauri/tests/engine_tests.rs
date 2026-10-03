@@ -85,6 +85,29 @@ Total PSS by process:
 }
 
 #[test]
+fn test_parse_process_ram_table_deduplication() {
+    let multi_section_procs = r#"
+Total RSS by process:
+    170,000K: com.instagram.android (pid 11624)
+Total RSS by OOM adjustment:
+    170,000K: com.instagram.android (pid 11624)
+Total PSS by process:
+    173,879K: com.instagram.android (pid 11624)
+Total PSS by OOM adjustment:
+    173,879K: com.instagram.android (pid 11624)
+Total RAM: 3,872,972K
+"#;
+
+    let map = ProcessParser::parse_process_ram_table(multi_section_procs);
+    assert_eq!(map.len(), 1);
+
+    let ig = map.get("com.instagram.android").unwrap();
+    assert_eq!(ig.0, Some(11624));
+    // Phải lấy đúng ~169.8 MB của PSS, tuyệt đối không bị cộng dồn thành 670 MB
+    assert!(ig.1 > 169.0 && ig.1 < 171.0);
+}
+
+#[test]
 fn test_parse_disabled_packages() {
     let sample_disabled = r#"
 package:com.facebook.katana
