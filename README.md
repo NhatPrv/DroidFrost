@@ -42,14 +42,19 @@ Repo chính thức: [https://github.com/NhatPrv/DroidFrost](https://github.com/N
 ## 🚀 Tính năng nổi bật
 
 1. **Giao tiếp ADB USB & Wireless Độc Lập:** Tự động phát hiện thiết bị khi cắm cáp hoặc ghép nối qua Wireless Debugging (Port 5555 / Pairing Code Android 11+).
-2. **Đo Lường RAM Realtime:** Phân tích `dumpsys meminfo` và `dumpsys activity processes` với tốc độ cao, hiển thị RAM tổng và RAM từng ứng dụng cụ thể.
-3. **Hai Chế Độ Tối Ưu:**
-   - **Kill (`am force-stop`):** Dọn dẹp RAM tức thì, thích hợp khi cần giải phóng bộ nhớ chơi game nặng.
-   - **Freeze (`pm disable-user --user 0`):** Đóng băng ứng dụng 100%, ẩn hoàn toàn khỏi Launcher, chặn broadcast receiver đánh thức máy.
-4. **Desktop Scheduler Engine:** Hẹn giờ rã đông tự động theo các mốc 15 phút, 1 giờ, 2 giờ, 8 giờ, 24 giờ.
+2. **Đo Lường RAM Chuẩn Xác 100%:**
+   - Đọc trực tiếp từ Kernel Linux `/proc/meminfo` trong ~30ms, bóc tách chính xác RAM vật lý, RAM khả dụng và bộ nhớ ảo **Swap / RAM Plus**.
+   - Thuật toán cô lập section `Total PSS by process:` và khử trùng lặp `HashSet<u32>` loại bỏ hoàn toàn lỗi nhân bốn RAM của Android.
+   - Cơ chế Fallback `ps -A -o PID,NAME,RSS` minh bạch cho các thiết bị cấu hình thấp.
+3. **Cơ Chế Tối Ưu Linh Hoạt:**
+   - **Dừng tạm (`am force-stop`):** Buộc dừng tiến trình tức thì để giải phóng RAM chơi game nặng.
+   - **Tắt hẳn / Đóng băng (`pm disable-user --user 0`):** Vô hiệu hóa ứng dụng 100%, ẩn hoàn toàn khỏi Launcher, ngăn chặn triệt để chạy ngầm và thông báo.
+   - **Batch Stop Siêu Tốc:** Nút *"Dừng tạm tất cả"* gộp chuỗi lệnh trong 1 subprocess shell duy nhất, xử lý 30–40 app chỉ trong **~100ms** (thay vì 4–5 giây).
+   - **One-Click Boost:** Một chạm tối ưu hóa tức thì các ứng dụng người dùng không thuộc Whitelist.
+4. **Desktop Scheduler Engine:** Hẹn giờ tự động rã đông / đóng băng theo các mốc 15 phút, 1 giờ, 2 giờ, 8 giờ, 24 giờ.
 5. **Disconnect Resilience (Chống Rút Cáp Đột Ngột):** Tự động phát hiện khi thiết bị kết nối lại và xử lý các tác vụ rã đông bị quá hạn một cách an toàn.
-6. **Smart Whitelist:** Bảo vệ tuyệt đối các gói hệ điều hành cốt lõi (`SystemUI`, `Telephony`, `GMS`, `Phone`) ngăn ngừa nguy cơ bootloop.
-7. **One-Click Boost:** Một chạm giải phóng RAM tối đa, đóng băng toàn bộ app không thuộc Whitelist.
+6. **Nhận Diện Cấp Quyền Thông Minh (Unauthorized Auto-Sync):** Cảnh báo trực quan bằng đèn vàng nhấp nháy khi thiết bị chưa cấp quyền khóa RSA, kèm màn hình hướng dẫn 3 bước và tự động nhận diện nạp dữ liệu ngay khi người dùng nhấn *"Cho phép"*.
+7. **Smart Whitelist:** Bảo vệ tuyệt đối các gói hệ điều hành cốt lõi (`SystemUI`, `Telephony`, `GMS`, `Phone`) ngăn ngừa mọi rủi ro bootloop.
 
 ---
 

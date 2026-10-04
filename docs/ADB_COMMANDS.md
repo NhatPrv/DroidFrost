@@ -14,11 +14,12 @@ Tài liệu này định nghĩa chi tiết tất cả các lệnh Android Debug 
 | **Gói hệ thống** | `pm list packages -s -f` | Non-Root | Liệt kê các ứng dụng được cài đặt mặc định trong ROM hệ thống (System Apps). |
 | **Gói đã đóng băng** | `pm list packages -d` | Non-Root | Liệt kê các ứng dụng hiện đang ở trạng thái vô hiệu hóa (Disabled/Frozen). |
 | **Buộc dừng app** | `am force-stop <pkg>` | Non-Root | Hủy ngay lập tức các tiến trình đang chạy của ứng dụng, giải phóng RAM. |
-| **Đóng băng app** | `pm disable-user --user 0 <pkg>` | Non-Root (`android.permission.MANAGE_USERS`) | Đóng băng ứng dụng hoàn toàn đối với User 0 (người dùng chính). |
+| **Dừng hàng loạt siêu tốc** | `sh -c "am force-stop p1; am force-stop p2; ..."` | Non-Root | Gộp chuỗi lệnh dừng trong 1 subprocess shell duy nhất (~100ms cho 30 apps). |
+| **Đóng băng app** | `pm disable-user --user 0 <pkg>` | Non-Root (`MANAGE_USERS`) | Đóng băng ứng dụng hoàn toàn đối với User 0 (người dùng chính). |
 | **Rã đông app** | `pm enable <pkg>` | Non-Root | Kích hoạt lại ứng dụng, đưa biểu tượng trở lại Launcher. |
-| **Đọc RAM tổng thể** | `dumpsys meminfo` | Non-Root | Trích xuất bảng phân bổ RAM (Total RAM, Free RAM, Used RAM, PSS, Buffers/Cached). |
-| **Đọc RAM theo app** | `dumpsys meminfo <pkg>` | Non-Root | Trích xuất chi tiết PSS, Private Dirty, Heap Alloc của từng tiến trình cụ thể. |
-| **Tiến trình đang chạy** | `dumpsys activity processes` | Non-Root | Quét danh sách các Process Records (PID, UID, Process Name, OOM Adj Level). |
+| **Đọc RAM Kernel & Swap** | `cat /proc/meminfo` | Non-Root | Đọc trực tiếp từ Kernel Linux (~30ms) lấy MemTotal, MemAvailable, SwapTotal, SwapFree. |
+| **Đọc RAM theo app (PSS)** | `dumpsys meminfo` | Non-Root | Trích xuất section `Total PSS by process:` và lọc trùng PID bằng `HashSet<u32>`. |
+| **Fallback đọc RAM (RSS)**| `ps -A -o PID,NAME,RSS` | Non-Root | Đọc bảng tiến trình và RSS dự phòng khi dumpsys bị từ chối. |
 
 ---
 
@@ -48,35 +49,47 @@ package:/system/priv-app/SystemUI/SystemUI.apk=com.android.systemui
 ^package:(?P<apk_path>.+?)=(?P<package_name>[a-zA-Z0-9_\.]+)$
 ```
 
-### 2.3. Phân tích RAM từ `dumpsys meminfo` (System-wide)
+### 2.3. Phân tích RAM hệ thống & Swap (`cat /proc/meminfo`)
 **Đầu ra mẫu:**
 ```
-Total RAM: 7,842,120K (status normal)
- Free RAM: 3,214,560K (  984,200K cached pss + 1,820,360K cached kernel +   410,000K free)
- Used RAM: 4,627,560K (3,520,120K used pss + 1,107,440K kernel)
+MemTotal:        3872972 kB
+MemFree:          150392 kB
+MemAvailable:     701396 kB
+Buffers:            1192 kB
+Cached:           719572 kB
+SwapTotal:       3145724 kB
+SwapFree:         868964 kB
 ```
-**Regex Pattern:**
-```regex
-Total RAM:\s*(?P<total_ram>[\d,]+)K
-Free RAM:\s*(?P<free_ram>[\d,]+)K
-Used RAM:\s*(?P<used_ram>[\d,]+)K
-```
+**Công thức tính toán:**
+- `Total RAM (MB)` = `MemTotal / 1024`
+- `Free/Available RAM (MB)` = `MemAvailable / 1024`
+- `Used RAM (MB)` = `Total RAM - Free RAM`
+- `Swap / RAM Plus Total (MB)` = `SwapTotal / 1024`
+- `Swap Used (MB)` = `(SwapTotal - SwapFree) / 1024`
 
-### 2.4. Phân tích RAM theo tiến trình (`dumpsys meminfo <pkg>`)
+### 2.4. Phân tích RAM tiến trình & Chống lặp (`dumpsys meminfo`)
+**Đầu ra mẫu (Section PSS Isolation):**
+```
+Total PSS by process:
+    215,680K: com.facebook.katana (pid 14522)
+    124,320K: com.zing.zalo (pid 18901)
+     45,100K: com.android.systemui:screenshot (pid 2411)
+Total PSS by OOM adjustment:
+    215,680K: com.facebook.katana (pid 14522)
+```
+**Quy tắc Parse:**
+1. Chỉ quét các dòng nằm giữa `Total PSS by process:` và tiêu đề section kế tiếp (`Total PSS by OOM adjustment:`).
+2. Dùng Regex: `^\s*(?P<ram_kb>[\d,]+)K:\s+(?P<pkg>[a-zA-Z0-9_\.\:]+)(?:\s+\(pid\s+(?P<pid>\d+)\))?`
+3. Lưu và kiểm tra `HashSet<u32>` theo PID để ngăn tuyệt đối tình trạng nhân lặp 4 lần bộ nhớ.
+
+### 2.5. Fallback bảng tiến trình (`ps -A -o PID,NAME,RSS`)
 **Đầu ra mẫu:**
 ```
-** MEMINFO in pid 14522 [com.facebook.katana] **
-                   Pss  Private  Private  SwapPss     Heap     Heap     Heap
-                 Total    Dirty    Clean    Dirty     Size    Alloc     Free
-                ------   ------   ------   ------   ------   ------   ------
-  Native Heap    45120    44892        0        0    98304    75230    23074
-  Dalvik Heap    62340    61200        0        0    84210    58120    26090
-        TOTAL   215680   185200     4200     1200   182514   133350    49164
+PID NAME RSS
+14091 com.facebook.katana 183000
+14092 com.facebook.katana:service 12000
 ```
-**Regex Pattern:**
-```regex
-TOTAL\s+(?P<total_pss>\d+)\s+(?P<private_dirty>\d+)
-```
+- Sử dụng khi `dumpsys meminfo` bị từ chối hoặc thiết bị chạy Android Go Edition. Hiển thị nhãn `RAM RSS` minh bạch trên UI.
 
 ---
 
