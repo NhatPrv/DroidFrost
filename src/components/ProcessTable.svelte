@@ -11,6 +11,8 @@
   export let onCancelSchedule: (pkg: string) => void;
   export let onBatchKill: (packages: string[]) => void;
   export let onBatchFreeze: (packages: string[]) => void;
+  export let onUninstall: ((pkg: string) => void) | undefined = undefined;
+  export let onBatchUninstall: ((packages: string[]) => void) | undefined = undefined;
   export let currentDevice: import('../types').DeviceInfo | undefined = undefined;
   export let onRefresh: (() => void) | undefined = undefined;
 
@@ -18,6 +20,8 @@
   let sortField: 'ram' | 'name' = 'ram';
   let sortAsc: boolean = false;
   let activeDropdownPkg: string | null = null;
+  let uninstallTarget: ProcessInfo | null = null;
+  let isBatchUninstallModal: boolean = false;
 
   function toggleSelectAll() {
     if (selectedPkgs.size === processes.length) {
@@ -288,6 +292,18 @@
                       </div>
                     {/if}
                   </div>
+
+                  <!-- Nút Gỡ cài đặt (Uninstall) -->
+                  <button
+                    class="btn btn-action btn-uninstall"
+                    on:click={() => (uninstallTarget = p)}
+                    title="Gỡ cài đặt ứng dụng khỏi thiết bị"
+                  >
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                    Gỡ
+                  </button>
                 {/if}
               </div>
             </td>
@@ -320,9 +336,106 @@
         >
           Tắt hẳn đã chọn
         </button>
+        <button
+          class="btn btn-uninstall-batch"
+          on:click={() => {
+            isBatchUninstallModal = true;
+          }}
+        >
+          Gỡ bỏ đã chọn ({selectedPkgs.size})
+        </button>
         <button class="btn" on:click={() => (selectedPkgs = new Set())}>
           Bỏ chọn
         </button>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Confirm Modal: Gỡ cài đặt 1 app -->
+  {#if uninstallTarget}
+    <div
+      class="modal-backdrop"
+      role="presentation"
+      on:click|self={() => (uninstallTarget = null)}
+      on:keydown={(e) => e.key === 'Escape' && (uninstallTarget = null)}
+    >
+      <div class="confirm-modal">
+        <div class="confirm-header">
+          <div class="confirm-icon danger">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <div class="confirm-title-box">
+            <h4 class="confirm-title">Xác nhận gỡ cài đặt</h4>
+            <p class="confirm-sub">{uninstallTarget.app_name} <small>({uninstallTarget.package_name})</small></p>
+          </div>
+        </div>
+        <div class="confirm-body">
+          {#if uninstallTarget.is_system}
+            <p>Đây là <strong>ứng dụng hệ thống</strong>. DroidFrost sẽ gỡ bỏ hoàn toàn ứng dụng này khỏi tài khoản người dùng chính (User 0).</p>
+            <p class="confirm-tip">💡 Ứng dụng sẽ biến mất 100% khỏi điện thoại, không còn chạy ngầm và không tốn tài nguyên.</p>
+          {:else}
+            <p>Hành động này sẽ gỡ bỏ hoàn toàn ứng dụng và toàn bộ dữ liệu ứng dụng khỏi thiết bị Android.</p>
+          {/if}
+        </div>
+        <div class="confirm-actions">
+          <button class="btn btn-ghost" on:click={() => (uninstallTarget = null)}>Hủy</button>
+          <button
+            class="btn btn-danger-solid"
+            on:click={() => {
+              if (uninstallTarget && onUninstall) {
+                onUninstall(uninstallTarget.package_name);
+              }
+              uninstallTarget = null;
+            }}
+          >
+            Gỡ cài đặt ngay
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Confirm Modal: Gỡ cài đặt hàng loạt -->
+  {#if isBatchUninstallModal}
+    <div
+      class="modal-backdrop"
+      role="presentation"
+      on:click|self={() => (isBatchUninstallModal = false)}
+      on:keydown={(e) => e.key === 'Escape' && (isBatchUninstallModal = false)}
+    >
+      <div class="confirm-modal">
+        <div class="confirm-header">
+          <div class="confirm-icon danger">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <div class="confirm-title-box">
+            <h4 class="confirm-title">Gỡ cài đặt hàng loạt</h4>
+            <p class="confirm-sub">Đã chọn {selectedPkgs.size} ứng dụng</p>
+          </div>
+        </div>
+        <div class="confirm-body">
+          <p>Bạn có chắc chắn muốn gỡ cài đặt toàn bộ <strong>{selectedPkgs.size} ứng dụng</strong> đã chọn không?</p>
+          <p class="confirm-tip">💡 Các ứng dụng đã chọn sẽ bị gỡ bỏ khỏi thiết bị Android.</p>
+        </div>
+        <div class="confirm-actions">
+          <button class="btn btn-ghost" on:click={() => (isBatchUninstallModal = false)}>Hủy</button>
+          <button
+            class="btn btn-danger-solid"
+            on:click={() => {
+              if (onBatchUninstall) {
+                onBatchUninstall(Array.from(selectedPkgs));
+              }
+              selectedPkgs = new Set();
+              isBatchUninstallModal = false;
+            }}
+          >
+            Xác nhận gỡ {selectedPkgs.size} ứng dụng
+          </button>
+        </div>
       </div>
     </div>
   {/if}
@@ -675,5 +788,152 @@
   .batch-buttons {
     display: flex;
     gap: 8px;
+  }
+
+  .btn-uninstall {
+    color: var(--text-muted);
+    border: 1px solid transparent;
+  }
+
+  .btn-uninstall:hover {
+    color: var(--status-danger);
+    background: rgba(244, 63, 94, 0.1);
+    border-color: rgba(244, 63, 94, 0.3);
+  }
+
+  .btn-uninstall-batch {
+    background: rgba(244, 63, 94, 0.15);
+    color: var(--status-danger);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+  }
+
+  .btn-uninstall-batch:hover {
+    background: var(--status-danger);
+    color: #fff;
+  }
+
+  /* Confirm Dialog Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .confirm-modal {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    width: 440px;
+    max-width: 90vw;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .confirm-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .confirm-icon.danger {
+    color: var(--status-danger);
+    background: rgba(244, 63, 94, 0.12);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .confirm-title-box {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .confirm-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .confirm-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .confirm-sub small {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .confirm-body {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .confirm-tip {
+    font-size: 11px;
+    color: var(--accent-frost);
+  }
+
+  .confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border-medium);
+    color: var(--text-secondary);
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .btn-ghost:hover {
+    background: var(--bg-surface-hover);
+    color: var(--text-primary);
+  }
+
+  .btn-danger-solid {
+    background: var(--status-danger);
+    border: none;
+    color: #fff;
+    font-weight: 600;
+    padding: 7px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+
+  .btn-danger-solid:hover {
+    opacity: 0.9;
   }
 </style>

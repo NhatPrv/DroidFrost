@@ -57,6 +57,12 @@ export const api = {
     return await inv('unfreeze_app', { serial, pkg });
   },
 
+  async uninstallApp(serial: string, pkg: string): Promise<OperationResult> {
+    const inv = await getInvoke();
+    if (!inv) return { success: false, message: 'Chưa kết nối Tauri Backend' };
+    return await inv('uninstall_app', { serial, pkg });
+  },
+
   async scheduleFreeze(
     serial: string,
     pkg: string,

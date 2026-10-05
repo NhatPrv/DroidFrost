@@ -131,6 +131,24 @@
     await refreshState();
   }
 
+  async function handleUninstall(pkg: string) {
+    if (!selectedSerial) return;
+    const res = await api.uninstallApp(selectedSerial, pkg);
+    showToast(res.message);
+    await refreshState();
+  }
+
+  async function handleBatchUninstall(pkgs: string[]) {
+    if (!selectedSerial) return;
+    let successCount = 0;
+    for (const pkg of pkgs) {
+      const res = await api.uninstallApp(selectedSerial, pkg);
+      if (res.success) successCount++;
+    }
+    showToast(`Đã gỡ cài đặt thành công ${successCount}/${pkgs.length} ứng dụng khỏi thiết bị.`);
+    await refreshState();
+  }
+
   async function handleOneClickBoost() {
     isBoosting = true;
     try {
@@ -250,6 +268,8 @@
     onCancelSchedule={handleCancelSchedule}
     onBatchKill={handleBatchKill}
     onBatchFreeze={handleBatchFreeze}
+    onUninstall={handleUninstall}
+    onBatchUninstall={handleBatchUninstall}
   />
 
   <!-- Wireless ADB Modal -->

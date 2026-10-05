@@ -53,6 +53,11 @@ async fn unfreeze_app(serial: String, pkg: String) -> Result<OperationResult, St
 }
 
 #[tauri::command]
+async fn uninstall_app(serial: String, pkg: String) -> Result<OperationResult, String> {
+    Ok(ProcessController::uninstall_app(&serial, &pkg).await)
+}
+
+#[tauri::command]
 async fn schedule_freeze(
     serial: String,
     pkg: String,
@@ -129,6 +134,7 @@ pub fn run() {
             kill_app,
             freeze_app,
             unfreeze_app,
+            uninstall_app,
             schedule_freeze,
             cancel_schedule,
             one_click_boost,
