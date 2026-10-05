@@ -16,9 +16,7 @@ Tài liệu này định nghĩa chi tiết tất cả các lệnh Android Debug 
 | **Buộc dừng app** | `am force-stop <pkg>` | Non-Root | Hủy ngay lập tức các tiến trình đang chạy của ứng dụng, giải phóng RAM. |
 | **Dừng hàng loạt siêu tốc** | `sh -c "am force-stop p1; am force-stop p2; ..."` | Non-Root | Gộp chuỗi lệnh dừng trong 1 subprocess shell duy nhất (~100ms cho 30 apps). |
 | **Đóng băng app** | `pm disable-user --user 0 <pkg>` | Non-Root (`MANAGE_USERS`) | Đóng băng ứng dụng hoàn toàn đối với User 0 (người dùng chính). |
-| **Rã đông app** | `pm enable <pkg>` | Non-Root | Kích hoạt lại ứng dụng, đưa biểu tượng trở lại Launcher. |
-| **Gỡ cài đặt User App** | `pm uninstall <pkg>` | Non-Root | Xóa bỏ hoàn toàn ứng dụng và dữ liệu liên quan khỏi thiết bị. |
-| **Gỡ bỏ System Bloatware** | `pm uninstall -k --user 0 <pkg>` | Non-Root | Gỡ bỏ hoàn toàn ứng dụng hệ thống/bloatware khỏi User 0 (người dùng chính). |
+| **Gỡ cài đặt (User Apps)** | `pm uninstall <pkg>` | Non-Root | Xóa bỏ hoàn toàn ứng dụng do người dùng cài đặt (Bảo vệ an toàn: Chặn gỡ ứng dụng hệ thống). |
 | **Đọc RAM Kernel & Swap** | `cat /proc/meminfo` | Non-Root | Đọc trực tiếp từ Kernel Linux (~30ms) lấy MemTotal, MemAvailable, SwapTotal, SwapFree. |
 | **Đọc RAM theo app (PSS)** | `dumpsys meminfo` | Non-Root | Trích xuất section `Total PSS by process:` và lọc trùng PID bằng `HashSet<u32>`. |
 | **Fallback đọc RAM (RSS)**| `ps -A -o PID,NAME,RSS` | Non-Root | Đọc bảng tiến trình và RSS dự phòng khi dumpsys bị từ chối. |

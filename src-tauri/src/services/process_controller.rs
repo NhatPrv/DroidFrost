@@ -70,7 +70,7 @@ impl ProcessController {
         }
     }
 
-    /// Gỡ cài đặt ứng dụng khỏi thiết bị (Hỗ trợ cả User App và System Bloatware qua User 0)
+    /// Gỡ cài đặt ứng dụng khỏi thiết bị (Chỉ cho phép ứng dụng người dùng tải về để bảo vệ hệ thống)
     pub async fn uninstall_app(serial: &str, pkg: &str) -> OperationResult {
         if !AdbExecutor::sanitize_package_name(pkg) {
             return OperationResult::err("Tên package không hợp lệ hoặc chứa ký tự nguy hiểm!");
@@ -80,21 +80,25 @@ impl ProcessController {
             return OperationResult::err("CẢNH BÁO BẢO VỆ: Gói này thuộc Whitelist cốt lõi, không thể gỡ cài đặt!");
         }
 
-        // Thử gỡ hoàn toàn cho ứng dụng người dùng trước
+        // Kiểm tra an toàn: Chỉ cho phép gỡ các ứng dụng bên thứ 3 người dùng tải về (pm list packages -3)
+        let user_pkgs_output = AdbExecutor::execute_shell(serial, &["pm", "list", "packages", "-3"])
+            .await
+            .unwrap_or_default();
+        let user_pkgs = ProcessParser::parse_disabled_packages(&user_pkgs_output);
+        if !user_pkgs.contains(pkg) {
+            return OperationResult::err(&format!(
+                "CẢNH BÁO AN TOÀN: {} là ứng dụng hệ thống! DroidFrost chỉ cho phép gỡ các ứng dụng do bạn tải về. Với ứng dụng hệ thống, bạn có thể chọn 'Tắt hẳn (Đóng băng)' để an toàn.",
+                pkg
+            ));
+        }
+
+        // Gỡ bỏ hoàn toàn ứng dụng tải về khỏi thiết bị
         match AdbExecutor::execute_shell(serial, &["pm", "uninstall", pkg]).await {
             Ok(out) if out.to_lowercase().contains("success") => {
                 OperationResult::ok(&format!("Đã gỡ cài đặt thành công ứng dụng {}", pkg))
             }
-            _ => {
-                // Nếu là ứng dụng hệ thống (System App / Bloatware), gỡ bỏ cho User 0
-                match AdbExecutor::execute_shell(serial, &["pm", "uninstall", "-k", "--user", "0", pkg]).await {
-                    Ok(out) if out.to_lowercase().contains("success") => {
-                        OperationResult::ok(&format!("Đã gỡ bỏ thành công ứng dụng {} cho người dùng hiện tại", pkg))
-                    }
-                    Ok(out) => OperationResult::err(&format!("Lỗi khi gỡ cài đặt {}: {}", pkg, out.trim())),
-                    Err(e) => OperationResult::err(&format!("Không thể thực thi lệnh gỡ cài đặt {}: {}", pkg, e)),
-                }
-            }
+            Ok(out) => OperationResult::err(&format!("Lỗi khi gỡ cài đặt {}: {}", pkg, out.trim())),
+            Err(e) => OperationResult::err(&format!("Không thể thực thi lệnh gỡ cài đặt {}: {}", pkg, e)),
         }
     }
 

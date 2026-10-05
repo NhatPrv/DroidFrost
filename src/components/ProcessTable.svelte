@@ -23,6 +23,11 @@
   let uninstallTarget: ProcessInfo | null = null;
   let isBatchUninstallModal: boolean = false;
 
+  $: stoppableSelectedPkgs = Array.from(selectedPkgs).filter((pkg) => {
+    const proc = processes.find((p) => p.package_name === pkg);
+    return proc && !proc.is_system && !proc.is_whitelisted;
+  });
+
   function toggleSelectAll() {
     if (selectedPkgs.size === processes.length) {
       selectedPkgs = new Set();
@@ -293,17 +298,19 @@
                     {/if}
                   </div>
 
-                  <!-- Nút Gỡ cài đặt (Uninstall) -->
-                  <button
-                    class="btn btn-action btn-uninstall"
-                    on:click={() => (uninstallTarget = p)}
-                    title="Gỡ cài đặt ứng dụng khỏi thiết bị"
-                  >
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                    Gỡ
-                  </button>
+                  <!-- Nút Gỡ cài đặt (Chỉ hiển thị cho ứng dụng tải về, ẩn hoàn toàn với app hệ thống) -->
+                  {#if !p.is_system && !p.is_whitelisted}
+                    <button
+                      class="btn btn-action btn-uninstall"
+                      on:click={() => (uninstallTarget = p)}
+                      title="Gỡ cài đặt ứng dụng đã tải khỏi thiết bị"
+                    >
+                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                      Gỡ
+                    </button>
+                  {/if}
                 {/if}
               </div>
             </td>
@@ -338,11 +345,13 @@
         </button>
         <button
           class="btn btn-uninstall-batch"
+          disabled={stoppableSelectedPkgs.length === 0}
+          title={stoppableSelectedPkgs.length === 0 ? 'Không có ứng dụng tải về nào được chọn (ứng dụng hệ thống được bảo vệ)' : 'Gỡ bỏ các ứng dụng đã tải được chọn'}
           on:click={() => {
             isBatchUninstallModal = true;
           }}
         >
-          Gỡ bỏ đã chọn ({selectedPkgs.size})
+          Gỡ bỏ đã chọn ({stoppableSelectedPkgs.length})
         </button>
         <button class="btn" on:click={() => (selectedPkgs = new Set())}>
           Bỏ chọn
@@ -372,12 +381,8 @@
           </div>
         </div>
         <div class="confirm-body">
-          {#if uninstallTarget.is_system}
-            <p>Đây là <strong>ứng dụng hệ thống</strong>. DroidFrost sẽ gỡ bỏ hoàn toàn ứng dụng này khỏi tài khoản người dùng chính (User 0).</p>
-            <p class="confirm-tip">💡 Ứng dụng sẽ biến mất 100% khỏi điện thoại, không còn chạy ngầm và không tốn tài nguyên.</p>
-          {:else}
-            <p>Hành động này sẽ gỡ bỏ hoàn toàn ứng dụng và toàn bộ dữ liệu ứng dụng khỏi thiết bị Android.</p>
-          {/if}
+          <p>Bạn có chắc chắn muốn gỡ cài đặt ứng dụng <strong>{uninstallTarget.app_name}</strong> khỏi thiết bị không?</p>
+          <p class="confirm-tip">💡 Hành động này sẽ gỡ bỏ hoàn toàn ứng dụng và toàn bộ dữ liệu ứng dụng khỏi điện thoại Android.</p>
         </div>
         <div class="confirm-actions">
           <button class="btn btn-ghost" on:click={() => (uninstallTarget = null)}>Hủy</button>
@@ -414,12 +419,12 @@
           </div>
           <div class="confirm-title-box">
             <h4 class="confirm-title">Gỡ cài đặt hàng loạt</h4>
-            <p class="confirm-sub">Đã chọn {selectedPkgs.size} ứng dụng</p>
+            <p class="confirm-sub">Đã chọn {stoppableSelectedPkgs.length} ứng dụng tải về</p>
           </div>
         </div>
         <div class="confirm-body">
-          <p>Bạn có chắc chắn muốn gỡ cài đặt toàn bộ <strong>{selectedPkgs.size} ứng dụng</strong> đã chọn không?</p>
-          <p class="confirm-tip">💡 Các ứng dụng đã chọn sẽ bị gỡ bỏ khỏi thiết bị Android.</p>
+          <p>Bạn có chắc chắn muốn gỡ cài đặt toàn bộ <strong>{stoppableSelectedPkgs.length} ứng dụng tải về</strong> đã chọn không?</p>
+          <p class="confirm-tip">💡 Các ứng dụng hệ thống được DroidFrost bảo vệ an toàn và tự động bỏ qua.</p>
         </div>
         <div class="confirm-actions">
           <button class="btn btn-ghost" on:click={() => (isBatchUninstallModal = false)}>Hủy</button>
@@ -427,13 +432,13 @@
             class="btn btn-danger-solid"
             on:click={() => {
               if (onBatchUninstall) {
-                onBatchUninstall(Array.from(selectedPkgs));
+                onBatchUninstall(stoppableSelectedPkgs);
               }
               selectedPkgs = new Set();
               isBatchUninstallModal = false;
             }}
           >
-            Xác nhận gỡ {selectedPkgs.size} ứng dụng
+            Xác nhận gỡ {stoppableSelectedPkgs.length} ứng dụng
           </button>
         </div>
       </div>
