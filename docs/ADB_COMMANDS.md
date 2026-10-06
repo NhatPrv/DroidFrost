@@ -17,6 +17,10 @@ Tài liệu này định nghĩa chi tiết tất cả các lệnh Android Debug 
 | **Dừng hàng loạt siêu tốc** | `sh -c "am force-stop p1; am force-stop p2; ..."` | Non-Root | Gộp chuỗi lệnh dừng trong 1 subprocess shell duy nhất (~100ms cho 30 apps). |
 | **Đóng băng app** | `pm disable-user --user 0 <pkg>` | Non-Root (`MANAGE_USERS`) | Đóng băng ứng dụng hoàn toàn đối với User 0 (người dùng chính). |
 | **Gỡ cài đặt (User Apps)** | `pm uninstall <pkg>` | Non-Root | Xóa bỏ hoàn toàn ứng dụng do người dùng cài đặt (Bảo vệ an toàn: Chặn gỡ ứng dụng hệ thống). |
+| **Đo dung lượng APK** | `pm path <pkg>` + `du -k <apk_path>` | Non-Root | Xác định chính xác kích thước tệp APK cài đặt gốc trên phân vùng `/data/app`. |
+| **Đo dữ liệu & Cache** | `du -sk /sdcard/Android/data/<pkg>` + `dumpsys diskstats` | Non-Root | Bóc tách chi tiết dung lượng dữ liệu người dùng (Data) và bộ nhớ đệm (Cache). |
+| **Xóa sạch dữ liệu (Clear Data)** | `pm clear <pkg>` | Non-Root | Xóa sạch toàn bộ tài khoản, cơ sở dữ liệu và reset app về trạng thái ban đầu. |
+| **Dọn bộ nhớ đệm (Clear Cache)** | `pm trim-caches <size>` & `rm -rf .../cache` | Non-Root | Giải phóng an toàn các tệp tạm thời mà không ảnh hưởng đến dữ liệu người dùng. |
 | **Đọc RAM Kernel & Swap** | `cat /proc/meminfo` | Non-Root | Đọc trực tiếp từ Kernel Linux (~30ms) lấy MemTotal, MemAvailable, SwapTotal, SwapFree. |
 | **Đọc RAM theo app (PSS)** | `dumpsys meminfo` | Non-Root | Trích xuất section `Total PSS by process:` và lọc trùng PID bằng `HashSet<u32>`. |
 | **Fallback đọc RAM (RSS)**| `ps -A -o PID,NAME,RSS` | Non-Root | Đọc bảng tiến trình và RSS dự phòng khi dumpsys bị từ chối. |
@@ -90,6 +94,17 @@ PID NAME RSS
 14092 com.facebook.katana:service 12000
 ```
 - Sử dụng khi `dumpsys meminfo` bị từ chối hoặc thiết bị chạy Android Go Edition. Hiển thị nhãn `RAM RSS` minh bạch trên UI.
+
+### 2.6. Đo lường & Quản lý bộ nhớ ứng dụng (Storage & Cache)
+1. **Đo dung lượng file APK:**
+   - Lệnh: `pm path <pkg>` -> nhận đường dẫn `package:/data/app/.../base.apk`
+   - Lệnh kích thước: `du -k <apk_path>` -> đọc dung lượng thực tế của file APK (KB).
+2. **Đo dung lượng Data & Cache:**
+   - Dữ liệu ngoài: `du -sk /sdcard/Android/data/<pkg>` và `/sdcard/Android/data/<pkg>/cache`
+   - Bổ trợ dữ liệu nội bộ qua: `dumpsys diskstats`
+3. **Thao tác xóa an toàn:**
+   - **Xóa Cache:** `rm -rf /sdcard/Android/data/<pkg>/cache/*` kết hợp `pm trim-caches 999999999999` (an toàn, không mất dữ liệu).
+   - **Xóa toàn bộ Data:** `pm clear <pkg>` (xóa toàn bộ tài khoản, cache, reset app; được chặn đối với Whitelist hệ thống).
 
 ---
 

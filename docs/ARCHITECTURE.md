@@ -169,3 +169,31 @@ Khi người dùng thực hiện *"Dừng tạm tất cả"* cho hàng chục �
 Hệ thống tích hợp quy tắc an toàn bảo vệ hệ điều hành (Safe-Guard):
 - **Hardcoded System Whitelist:** Các gói dịch vụ cốt lõi của Android (`android`, `com.android.systemui`, `com.android.phone`, `com.android.providers.telephony`, `com.google.android.gms`) được bảo vệ hoàn toàn, ngăn chặn việc đóng băng nhầm gây treo máy (bootloop / soft-brick).
 - **Graceful Fallback:** Trước khi thực hiện thao tác Freeze hoặc Kill hàng loạt ("One-Click Boost"), hệ thống luôn kiểm tra chéo với danh sách bảo vệ.
+
+---
+
+## 8. Storage & Cache Management Architecture
+
+Hệ thống cung cấp cơ chế phân tích và dọn dẹp dung lượng bộ nhớ cho từng ứng dụng:
+
+```
+[UI: Click App Cell / Nút Bộ nhớ]
+              │
+              ▼
+[Tauri IPC: `get_app_storage(serial, pkg)`]
+              │
+              ├─► 1. `pm path <pkg>` + `du -k <apk_path>` ──► Kích thước file APK (MB)
+              ├─► 2. `du -sk /sdcard/Android/data/<pkg>` ───► Dữ liệu ngoài (MB)
+              └─► 3. `dumpsys diskstats` ──────────────────► Data & Cache nội bộ (MB)
+              │
+              ▼
+[StorageModal: Hiển thị Breakdown Bar & Thẻ Metric]
+              │
+              ├─► [Xóa Cache] ──► [Popup Xác nhận] ──► `pm trim-caches` & dọn cache ngoài (An toàn 100%)
+              └─► [Xóa Data]  ──► [Whitelist Guard] ──► [Popup Cảnh báo Đỏ] ──► `pm clear <pkg>` (Reset app)
+```
+
+- **Quy tắc an toàn tuyệt đối:**
+  - `pm clear` luôn bị chặn nếu gói ứng dụng thuộc Whitelist cốt lõi của hệ thống.
+  - Bắt buộc có Modal hộp thoại xác nhận (Confirm Dialog) riêng biệt với cảnh báo tương ứng trước khi phát lệnh xóa xuống thiết bị.
+
