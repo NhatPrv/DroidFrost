@@ -45,4 +45,12 @@ export interface OperationResult {
   data?: any;
 }
 
+export interface AppStorageInfo {
+  package_name: string;
+  apk_size_mb: number;
+  data_size_mb: number;
+  cache_size_mb: number;
+  total_storage_mb: number;
+}
+
 export type TabFilter = 'all' | 'running' | 'frozen' | 'scheduled';

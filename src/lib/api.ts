@@ -1,4 +1,5 @@
 import type {
+  AppStorageInfo,
   DeviceInfo,
   OneClickBoostResult,
   OperationResult,
@@ -61,6 +62,32 @@ export const api = {
     const inv = await getInvoke();
     if (!inv) return { success: false, message: 'Chưa kết nối Tauri Backend' };
     return await inv('uninstall_app', { serial, pkg });
+  },
+
+  async getAppStorage(serial: string, pkg: string): Promise<AppStorageInfo> {
+    const inv = await getInvoke();
+    if (!inv) {
+      return {
+        package_name: pkg,
+        apk_size_mb: 0,
+        data_size_mb: 0,
+        cache_size_mb: 0,
+        total_storage_mb: 0,
+      };
+    }
+    return await inv('get_app_storage', { serial, pkg });
+  },
+
+  async clearAppData(serial: string, pkg: string): Promise<OperationResult> {
+    const inv = await getInvoke();
+    if (!inv) return { success: false, message: 'Chưa kết nối Tauri Backend' };
+    return await inv('clear_app_data', { serial, pkg });
+  },
+
+  async clearAppCache(serial: string, pkg: string): Promise<OperationResult> {
+    const inv = await getInvoke();
+    if (!inv) return { success: false, message: 'Chưa kết nối Tauri Backend' };
+    return await inv('clear_app_cache', { serial, pkg });
   },
 
   async scheduleFreeze(
