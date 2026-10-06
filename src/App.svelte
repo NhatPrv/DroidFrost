@@ -270,6 +270,7 @@
     onBatchFreeze={handleBatchFreeze}
     onUninstall={handleUninstall}
     onBatchUninstall={handleBatchUninstall}
+    onNotify={showToast}
   />
 
   <!-- Wireless ADB Modal -->

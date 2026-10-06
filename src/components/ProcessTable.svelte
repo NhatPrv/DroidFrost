@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ProcessInfo } from '../types';
   import { getAppIconSvg } from '../lib/icons';
+  import StorageModal from './StorageModal.svelte';
 
   export let processes: ProcessInfo[] = [];
   export let processMetric: 'PSS' | 'RSS' = 'PSS';
@@ -15,12 +16,14 @@
   export let onBatchUninstall: ((packages: string[]) => void) | undefined = undefined;
   export let currentDevice: import('../types').DeviceInfo | undefined = undefined;
   export let onRefresh: (() => void) | undefined = undefined;
+  export let onNotify: ((msg: string) => void) | undefined = undefined;
 
   let selectedPkgs: Set<string> = new Set();
   let sortField: 'ram' | 'name' = 'ram';
   let sortAsc: boolean = false;
   let activeDropdownPkg: string | null = null;
   let uninstallTarget: ProcessInfo | null = null;
+  let storageTarget: ProcessInfo | null = null;
   let isBatchUninstallModal: boolean = false;
 
   $: stoppableSelectedPkgs = Array.from(selectedPkgs).filter((pkg) => {
@@ -180,7 +183,14 @@
 
             <!-- App Logo + Name -->
             <td class="col-app">
-              <div class="app-cell">
+              <div
+                class="app-cell clickable-app"
+                role="button"
+                tabindex="0"
+                on:click={() => (storageTarget = p)}
+                on:keydown={(e) => e.key === 'Enter' && (storageTarget = p)}
+                title="Bấm để xem dung lượng bộ nhớ & bộ nhớ đệm"
+              >
                 <div class="app-icon-box">
                   {@html getAppIconSvg(p.package_name, p.app_name)}
                 </div>
@@ -312,6 +322,20 @@
                     </button>
                   {/if}
                 {/if}
+
+                <!-- Nút Chi tiết Dung lượng & Cache -->
+                <button
+                  class="btn btn-action btn-storage"
+                  on:click|stopPropagation={() => (storageTarget = p)}
+                  title="Xem thông tin bộ nhớ và dọn dẹp cache/dữ liệu"
+                >
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                  </svg>
+                  Bộ nhớ
+                </button>
               </div>
             </td>
           </tr>
@@ -444,6 +468,19 @@
       </div>
     </div>
   {/if}
+
+  <!-- Storage & Cache Modal -->
+  {#if storageTarget && currentDevice}
+    <StorageModal
+      process={storageTarget}
+      serial={currentDevice.serial}
+      onClose={() => (storageTarget = null)}
+      onNotify={(msg) => {
+        if (onNotify) onNotify(msg);
+        if (onRefresh) onRefresh();
+      }}
+    />
+  {/if}
 </div>
 
 <style>
@@ -520,6 +557,18 @@
     display: flex;
     align-items: center;
     gap: 12px;
+  }
+
+  .clickable-app {
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+    margin: -4px -6px;
+    transition: background 0.15s ease;
+  }
+
+  .clickable-app:hover {
+    background: rgba(56, 189, 248, 0.08);
   }
 
   .app-icon-box {
@@ -610,6 +659,17 @@
     padding: 3px 8px;
     font-size: 11px;
     font-weight: 500;
+  }
+
+  .btn-storage {
+    color: var(--accent-frost);
+    border-color: rgba(56, 189, 248, 0.25);
+    background: rgba(56, 189, 248, 0.06);
+  }
+
+  .btn-storage:hover {
+    background: rgba(56, 189, 248, 0.16);
+    border-color: var(--accent-frost);
   }
 
   .dropdown-anchor {
