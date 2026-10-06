@@ -49,6 +49,15 @@ pub struct SystemMemoryInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppStorageInfo {
+    pub package_name: String,
+    pub apk_size_mb: f64,
+    pub data_size_mb: f64,
+    pub cache_size_mb: f64,
+    pub total_storage_mb: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduledTask {
     pub id: String,
     pub package_name: String,

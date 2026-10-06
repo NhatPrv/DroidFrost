@@ -1,4 +1,4 @@
-use crate::models::{OneClickBoostResult, OperationResult, ProcessInfo, SystemMemoryInfo};
+use crate::models::{AppStorageInfo, OneClickBoostResult, OperationResult, ProcessInfo, SystemMemoryInfo};
 use crate::services::adb_executor::AdbExecutor;
 use crate::services::process_parser::ProcessParser;
 use std::collections::HashMap;
@@ -220,5 +220,124 @@ impl ProcessController {
             freed_ram_mb: 0.0,
             packages_affected: valid_targets,
         })
+    }
+
+    /// Lấy thông tin chi tiết dung lượng bộ nhớ (APK, Data, Cache) của 1 ứng dụng
+    pub async fn get_app_storage(serial: &str, pkg: &str) -> Result<AppStorageInfo, String> {
+        if !AdbExecutor::sanitize_package_name(pkg) {
+            return Err("Tên package không hợp lệ!".into());
+        }
+
+        // 1. Lấy kích thước tệp APK cài đặt
+        let path_output = AdbExecutor::execute_shell(serial, &["pm", "path", pkg])
+            .await
+            .unwrap_or_default();
+
+        let mut apk_bytes: f64 = 0.0;
+        for line in path_output.lines() {
+            if let Some(apk_path) = line.strip_prefix("package:") {
+                let trimmed = apk_path.trim();
+                if !trimmed.is_empty() {
+                    let du_out = AdbExecutor::execute_shell(serial, &["du", "-k", trimmed])
+                        .await
+                        .unwrap_or_default();
+                    if let Some(first) = du_out.split_whitespace().next() {
+                        if let Ok(kb) = first.parse::<f64>() {
+                            apk_bytes += kb * 1024.0;
+                        }
+                    }
+                }
+            }
+        }
+        let apk_size_mb = (apk_bytes / 1024.0 / 1024.0 * 10.0).round() / 10.0;
+
+        // 2. Lấy kích thước dữ liệu và cache từ thư mục lưu trữ ngoài
+        let data_dir = format!("/sdcard/Android/data/{}", pkg);
+        let cache_dir = format!("/sdcard/Android/data/{}/cache", pkg);
+
+        let data_out = AdbExecutor::execute_shell(serial, &["du", "-sk", &data_dir])
+            .await
+            .unwrap_or_default();
+        let ext_data_kb = data_out
+            .split_whitespace()
+            .next()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(0.0);
+
+        let cache_out = AdbExecutor::execute_shell(serial, &["du", "-sk", &cache_dir])
+            .await
+            .unwrap_or_default();
+        let ext_cache_kb = cache_out
+            .split_whitespace()
+            .next()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(0.0);
+
+        let mut data_size_mb = (ext_data_kb / 1024.0 * 10.0).round() / 10.0;
+        let mut cache_size_mb = (ext_cache_kb / 1024.0 * 10.0).round() / 10.0;
+
+        // 3. Đọc dữ liệu bổ sung từ dumpsys diskstats nếu khả dụng
+        let diskstats = AdbExecutor::execute_shell(serial, &["dumpsys", "diskstats"])
+            .await
+            .unwrap_or_default();
+
+        for line in diskstats.lines() {
+            if line.contains(pkg) {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                for (idx, &part) in parts.iter().enumerate() {
+                    if part.starts_with(pkg) {
+                        let d_kb = parts.get(idx + 1).and_then(|s| s.replace(',', "").parse::<f64>().ok()).unwrap_or(0.0);
+                        let c_kb = parts.get(idx + 2).and_then(|s| s.replace(',', "").parse::<f64>().ok()).unwrap_or(0.0);
+                        let d_mb = (d_kb / 1024.0 * 10.0).round() / 10.0;
+                        let c_mb = (c_kb / 1024.0 * 10.0).round() / 10.0;
+                        data_size_mb = data_size_mb.max(d_mb);
+                        cache_size_mb = cache_size_mb.max(c_mb);
+                        break;
+                    }
+                }
+            }
+        }
+
+        let total_storage_mb = ((apk_size_mb + data_size_mb + cache_size_mb) * 10.0).round() / 10.0;
+
+        Ok(AppStorageInfo {
+            package_name: pkg.to_string(),
+            apk_size_mb,
+            data_size_mb,
+            cache_size_mb,
+            total_storage_mb,
+        })
+    }
+
+    /// Xóa toàn bộ dữ liệu ứng dụng và cache (pm clear)
+    pub async fn clear_app_data(serial: &str, pkg: &str) -> OperationResult {
+        if !AdbExecutor::sanitize_package_name(pkg) {
+            return OperationResult::err("Tên package không hợp lệ!");
+        }
+
+        if ProcessParser::is_whitelisted(pkg) {
+            return OperationResult::err("CẢNH BÁO BẢO VỆ: Gói này thuộc Whitelist cốt lõi, không thể xóa dữ liệu!");
+        }
+
+        match AdbExecutor::execute_shell(serial, &["pm", "clear", pkg]).await {
+            Ok(out) if out.to_lowercase().contains("success") => {
+                OperationResult::ok(&format!("Đã xóa sạch toàn bộ dữ liệu và bộ nhớ đệm của {}", pkg))
+            }
+            Ok(out) => OperationResult::err(&format!("Lỗi khi xóa dữ liệu {}: {}", pkg, out.trim())),
+            Err(e) => OperationResult::err(&format!("Không thể thực thi lệnh xóa dữ liệu: {}", e)),
+        }
+    }
+
+    /// Xóa riêng bộ nhớ đệm (Cache) của ứng dụng
+    pub async fn clear_app_cache(serial: &str, pkg: &str) -> OperationResult {
+        if !AdbExecutor::sanitize_package_name(pkg) {
+            return OperationResult::err("Tên package không hợp lệ!");
+        }
+
+        let ext_cache = format!("/sdcard/Android/data/{}/cache", pkg);
+        let _ = AdbExecutor::execute_shell(serial, &["rm", "-rf", &ext_cache]).await;
+        let _ = AdbExecutor::execute_shell(serial, &["pm", "trim-caches", "999999999999"]).await;
+
+        OperationResult::ok(&format!("Đã dọn dẹp bộ nhớ đệm cho {}", pkg))
     }
 }

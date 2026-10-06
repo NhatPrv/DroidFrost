@@ -1,7 +1,7 @@
 pub mod models;
 pub mod services;
 
-use models::{DeviceInfo, OneClickBoostResult, OperationResult, ProcessInfo, SystemMemoryInfo};
+use models::{AppStorageInfo, DeviceInfo, OneClickBoostResult, OperationResult, ProcessInfo, SystemMemoryInfo};
 use services::device_detector::DeviceDetectorService;
 use services::process_controller::ProcessController;
 use services::scheduler::FreezeSchedulerService;
@@ -55,6 +55,21 @@ async fn unfreeze_app(serial: String, pkg: String) -> Result<OperationResult, St
 #[tauri::command]
 async fn uninstall_app(serial: String, pkg: String) -> Result<OperationResult, String> {
     Ok(ProcessController::uninstall_app(&serial, &pkg).await)
+}
+
+#[tauri::command]
+async fn get_app_storage(serial: String, pkg: String) -> Result<AppStorageInfo, String> {
+    ProcessController::get_app_storage(&serial, &pkg).await
+}
+
+#[tauri::command]
+async fn clear_app_data(serial: String, pkg: String) -> Result<OperationResult, String> {
+    Ok(ProcessController::clear_app_data(&serial, &pkg).await)
+}
+
+#[tauri::command]
+async fn clear_app_cache(serial: String, pkg: String) -> Result<OperationResult, String> {
+    Ok(ProcessController::clear_app_cache(&serial, &pkg).await)
 }
 
 #[tauri::command]
@@ -135,6 +150,9 @@ pub fn run() {
             freeze_app,
             unfreeze_app,
             uninstall_app,
+            get_app_storage,
+            clear_app_data,
+            clear_app_cache,
             schedule_freeze,
             cancel_schedule,
             one_click_boost,
